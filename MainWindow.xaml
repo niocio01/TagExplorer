@@ -1,0 +1,121 @@
+﻿<Window x:Class="TagExplorer.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:TagExplorer"
+        xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+        mc:Ignorable="d"
+        Style="{StaticResource MaterialDesignWindow}"
+        Background="{DynamicResource MaterialDesign.Brush.Background}"
+        Title="MainWindow" Height="450" Width="800">
+    <DockPanel>
+        <StatusBar
+            DockPanel.Dock="Bottom"
+            Background="{DynamicResource MaterialDesign.Brush.Background}"
+            BorderBrush="{DynamicResource MaterialDesignLightSeparatorBackground}"
+            BorderThickness="0 2 0 0" >
+            <StatusBar.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                    </Grid>
+                </ItemsPanelTemplate>
+            </StatusBar.ItemsPanel>
+            <StatusBarItem Grid.Column="0">
+                <TextBlock
+                    Style="{StaticResource MaterialDesignBody2TextBlock}"
+                    Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
+                    Text="Ready"
+                    Margin="5"/>
+            </StatusBarItem>
+            <Separator Grid.Column="1" Width="1"></Separator>
+            <Separator Grid.Column="3" Width="1"></Separator>
+            <StatusBarItem Grid.Column="4">
+                <Button Style="{StaticResource MaterialDesignFlatLightButton}"
+                        Padding="0">
+                    <materialDesign:PackIcon
+                    Height="22"
+                    Width="22"
+                    Kind="GearOutline"
+                    Margin="5" />
+                </Button>
+            </StatusBarItem>
+        </StatusBar>
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <Grid Grid.Column="0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <Grid Grid.Row="0" Margin="0 5 0 0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock
+                        Grid.Column="1"
+                        Style="{StaticResource MaterialDesignHeadline5TextBlock}"
+                        Text="Tags" 
+                        VerticalAlignment="Center"/>
+                    <materialDesign:PackIcon
+                        VerticalAlignment="Center"
+                        Grid.Column="2"
+                        Height="22"
+                        Width="22"
+                        Kind="TagOutline"
+                        Margin="5" />
+                </Grid>
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"></ScrollViewer>
+            </Grid>
+            <GridSplitter 
+            Style="{StaticResource MaterialDesignGridSplitter}"
+            Grid.Column="1"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Stretch"
+            ShowsPreview="True"
+            Width="5" />
+            <Grid Grid.Column="2" Margin="0 5 0 0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock
+                        Grid.Column="1"
+                        VerticalAlignment="Center"
+                        Style="{StaticResource MaterialDesignHeadline5TextBlock}"
+                        HorizontalAlignment="Center"
+                        Text="Files" />
+                    <materialDesign:PackIcon
+                        VerticalAlignment="Center"
+                        Grid.Column="2"
+                        Height="22"
+                        Width="22"
+                        Kind="FileOutline"
+                        Margin="5" />
+                </Grid>
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"></ScrollViewer>
+            </Grid>
+        </Grid>
+    </DockPanel>
+</Window>
