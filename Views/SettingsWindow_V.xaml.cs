@@ -1,4 +1,8 @@
-﻿using System.Text;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -7,19 +11,24 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
 using System.Windows.Shapes;
+using TagExplorer.ViewModels;
 
-namespace TagExplorer
+namespace TagExplorer.Views
 {
     /// <summary>
-    /// Interaction logic for MainWindow.xaml
+    /// Interaction logic for Settings.xaml
     /// </summary>
-    public partial class MainWindow : Window
+    public partial class SettingsWindow_V : Window
     {
-        public MainWindow()
+        private readonly SettingsWindow_VM ViewModel;
+
+        public SettingsWindow_V()
         {
             InitializeComponent();
+
+            ViewModel = new SettingsWindow_VM(this);
+            DataContext = ViewModel;
         }
 
         protected override void OnSourceInitialized(EventArgs e)
