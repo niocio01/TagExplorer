@@ -19,16 +19,13 @@ namespace TagExplorer
     /// </summary>
     public partial class MainWindow : Window
     {
-        MainWindow_VM ViewModel;
-        SettingsWindow_V SettingsWindow;
         public MainWindow()
         {
+            Main.InitPre();
+
             InitializeComponent();
 
-            ViewModel = new MainWindow_VM();
-            DataContext = ViewModel;
-
-            
+            Main.InitPost();
 
         }
 

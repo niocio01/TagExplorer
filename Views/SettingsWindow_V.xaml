@@ -5,12 +5,18 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:TagExplorer.Views"
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+        xmlns:vm="clr-namespace:TagExplorer.ViewModels"
         Style="{StaticResource MaterialDesignWindow}"
+        TextElement.Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
         Background="{DynamicResource MaterialDesign.Brush.Background}"
         mc:Ignorable="d"
         Title="Settings" Height="450" Width="800">
+    <Window.DataContext>
+        <vm:SettingsWindow_VM />
+    </Window.DataContext>
     <Grid>
         <TabControl
+            
             materialDesign:NavigationRailAssist.ShowSelectionBackground="True"
             materialDesign:NavigationRailAssist.CornerRadius="5"
             materialDesign:NavigationRailAssist.SelectionCornerRadius="5"
@@ -32,23 +38,11 @@
                             Text="Library" />
                     </StackPanel>
                 </TabItem.Header>
-                <StackPanel
+                <Grid
                     Margin="16">
-                    <TextBlock
-                        Margin="0,0,0,8"
-                        Style="{StaticResource MaterialDesignHeadline5TextBlock}"
-                        Text="Library Folders" />
-                    <TextBlock>
-                        <Run
-                            Text="Select Base folders or Drives to include in your library" />
-                            <LineBreak />
-                            <LineBreak />
-                        <Run
-                            FontStyle="Italic">
-                            Neque porro quisquam est qui dolorem ipsum quia dolor sit amet, consectetur, adipisci velit...
-                        </Run>
-                    </TextBlock>
-                </StackPanel>
+                    <local:BaseFolderSelector_V
+                        Grid.Row="0"/>
+                </Grid>
             </TabItem>
             <TabItem>
                 <TabItem.Header>
@@ -59,31 +53,42 @@
                             Width="24"
                             Height="24"
                             HorizontalAlignment="Center"
-                            Kind="ClockOutline" />
+                            Kind="DatabaseCogOutline" />
                             <TextBlock
                                 HorizontalAlignment="Center"
-                                Text="Recent" />
+                                Text="Database" />
                     </StackPanel>
                 </TabItem.Header>
-                <StackPanel
+                <Grid
                     Margin="16">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
                     <TextBlock
+                        Grid.Row="0"
                         Margin="0,0,0,8"
                         Style="{StaticResource MaterialDesignHeadline5TextBlock}"
-                        Text="Recent" />
-                    <TextBlock>
-                    <Run
-                        Text="tab 2 content. Default look and behaviors." />
-                        <LineBreak />
-                        <LineBreak />
-                    <Run
-                        FontStyle="Italic">
-                        Neque porro quisquam est qui dolorem ipsum quia dolor sit amet, consectetur, adipisci velit...
-                    </Run>
-                    </TextBlock>
-                </StackPanel>
+                        Text="Database connection settings" />
+                    <TextBlock
+                        Grid.Row="1"
+                        Text="Setup the connection to the PostgreSQL Server to store the data." />
+                    <ScrollViewer
+                        Grid.Row="2" 
+                        VerticalScrollBarVisibility="Auto">
+                        <local:DBConnectionSettings_V
+                            DataContext="{Binding Path=.}"/>
+                    </ScrollViewer>
+                    <Button
+                        Grid.Row="3"
+                        Command="{Binding Path=SaveSettingsCommand}"
+                        VerticalAlignment="Bottom"
+                        Content="Save"
+                        Style="{StaticResource MaterialDesignRaisedButton}" />
+                </Grid>
             </TabItem>
         </TabControl>
-
     </Grid>
 </Window>
