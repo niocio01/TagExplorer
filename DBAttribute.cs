@@ -6,17 +6,14 @@ using System.Threading.Tasks;
 
 namespace TagExplorer;
 
-public class DbAttribute(int index, string name, Type type, string dbType, string additionalProperties = "")
+public class DbAttribute(
+    int index,
+    string name,
+    string setupString,
+    bool writeProperty = true)
 {
     public int Index { get; private set; } = index;
+    public bool WriteProperty { get; private set; } = writeProperty;
     public string Name { get; private set; } = name;
-    public Type Type { get; private set; } = type;
-    public string DbType { get; private set; } = dbType;
-
-    public string DbAdditionalProperties { get; private set; } = additionalProperties;
-
-    public void SetValue(string dbValue, ref object value)
-    {
-        value = Convert.ChangeType(dbValue, typeof(Type));
-    }
+    public string SetupString { get; private set; } = setupString;
 }

@@ -10,37 +10,60 @@ namespace TagExplorer
 {
     public static class Main
     {
-        public static ObservableCollection<BaseFolder> BaseFolders = new ObservableCollection<BaseFolder>();
         public static DBConnectionSettings_M DBConnectionSettings = new DBConnectionSettings_M();
+        public static BaseFolderTable BaseFolderTable = new BaseFolderTable();
+        public static ColorTable ColorTable = new ColorTable();
         public static TagTable TagTable = new TagTable();
 
         public static async void InitPre()
         {
             DBConnector.CheckConnection(DBConnectionSettings);
-            LoadBaseFolders();
+            if (DBConnector.CurrentConnectionState != DBConnector.ConnectionState.Connected) return;
+            if (!await BaseFolderTable.TableExists())
+            {
+                BaseFolderTable.CreateTable();
+            }
+
+            BaseFolderTable.GetList();
+
+            if (!await ColorTable.TableExists())
+            {
+                ColorTable.CreateTable();
+                DefaultColors.AddDefaultColors(ColorTable);
+            }
+            else
+            {
+                //ColorTable.GetList();
+            }
+
             if (!await TagTable.TableExists())
             {
                 TagTable.CreateTable();
+                SystemTags.AddSystemTags();
             }
+
+            TagTable.GetList();
+            GetMissingTableData();
+        }
+
+        public static void GetMissingTableData()
+        {
+            while (!AllDataIsFilled())
+            {
+                BaseFolderTable.GetMissingData();
+                ColorTable.GetMissingData();
+                TagTable.GetMissingData();
+            }
+        }
+
+        public static bool AllDataIsFilled()
+        {
+            return BaseFolderTable.DataIsFilled && ColorTable.DataIsFilled && TagTable.DataIsFilled;
         }
 
         public static void InitPost()
         {
             // Do something
         }
-
-        public static async void LoadBaseFolders()
-        {
-            if (DBConnector.CurrentConnectionState == DBConnector.ConnectionState.Connected)
-            {
-                if (!await DBConnector.TableExistsAsync("base_folders"))
-                {
-                    await DBConnector.CreateBaseFolderTable();
-                }
-                await DBConnector.LoadBaseFolders();
-            }
-        }
-
-        
     }
 }

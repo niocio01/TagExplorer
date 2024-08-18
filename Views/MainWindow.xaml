@@ -6,6 +6,7 @@
         xmlns:local="clr-namespace:TagExplorer"
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         xmlns:viewModels="clr-namespace:TagExplorer.ViewModels"
+        xmlns:views="clr-namespace:TagExplorer.Views"
         mc:Ignorable="d"
         Style="{StaticResource MaterialDesignWindow}"
         TextElement.Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
@@ -64,7 +65,7 @@
             <Grid Grid.Column="0">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
                 <Grid Grid.Row="0" Margin="0 5 0 0">
                     <Grid.ColumnDefinitions>
@@ -86,7 +87,7 @@
                         Kind="TagOutline"
                         Margin="5" />
                 </Grid>
-                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"></ScrollViewer>
+                <views:Tabs_V Grid.Row="1" />
             </Grid>
             <GridSplitter 
             Style="{StaticResource MaterialDesignGridSplitter}"

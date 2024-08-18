@@ -29,5 +29,4 @@ internal class ManualTagAssignment : ITableObject
         Tag = tag;
         Folder = folder;
     }
-
 }

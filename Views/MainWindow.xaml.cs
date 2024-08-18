@@ -26,7 +26,6 @@ namespace TagExplorer
             InitializeComponent();
 
             Main.InitPost();
-
         }
 
         protected override void OnSourceInitialized(EventArgs e)

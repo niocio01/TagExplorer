@@ -11,12 +11,11 @@ namespace TagExplorer.ViewModels;
 
 public partial class BaseFolderSelector_VM : ObservableObject
 {
-    [ObservableProperty]
-    private ObservableCollection<BaseFolder> _baseFolders;
+    [ObservableProperty] private ObservableCollection<BaseFolder> _baseFolders;
 
     public BaseFolderSelector_VM()
     {
-        BaseFolders = Main.BaseFolders;
+        BaseFolders = Main.BaseFolderTable.Data;
     }
 
     [RelayCommand]
