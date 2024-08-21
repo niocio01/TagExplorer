@@ -1,69 +1,74 @@
-﻿using System;
+﻿using CommunityToolkit.Mvvm.Messaging.Messages;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using CommunityToolkit.Mvvm.Messaging;
 using TagExplorer.Models;
 
-namespace TagExplorer
+namespace TagExplorer;
+
+public static class Main
 {
-    public static class Main
+    public static DBConnectionSettings_M DBConnectionSettings = new DBConnectionSettings_M();
+    public static BaseFolderTable BaseFolderTable = new BaseFolderTable();
+    public static ColorTable ColorTable = new ColorTable();
+    public static TagTable TagTable = new TagTable();
+
+    public static async void InitPre()
     {
-        public static DBConnectionSettings_M DBConnectionSettings = new DBConnectionSettings_M();
-        public static BaseFolderTable BaseFolderTable = new BaseFolderTable();
-        public static ColorTable ColorTable = new ColorTable();
-        public static TagTable TagTable = new TagTable();
-
-        public static async void InitPre()
+        DBConnector.CheckConnection(DBConnectionSettings);
+        if (DBConnector.CurrentConnectionState != DBConnector.ConnectionState.Connected) return;
+        if (!await BaseFolderTable.TableExists())
         {
-            DBConnector.CheckConnection(DBConnectionSettings);
-            if (DBConnector.CurrentConnectionState != DBConnector.ConnectionState.Connected) return;
-            if (!await BaseFolderTable.TableExists())
-            {
-                BaseFolderTable.CreateTable();
-            }
-
-            BaseFolderTable.GetList();
-
-            if (!await ColorTable.TableExists())
-            {
-                ColorTable.CreateTable();
-                DefaultColors.AddDefaultColors(ColorTable);
-            }
-            else
-            {
-                //ColorTable.GetList();
-            }
-
-            if (!await TagTable.TableExists())
-            {
-                TagTable.CreateTable();
-                SystemTags.AddSystemTags();
-            }
-
-            TagTable.GetList();
-            GetMissingTableData();
+            BaseFolderTable.CreateTable();
         }
 
-        public static void GetMissingTableData()
+        BaseFolderTable.GetList();
+
+        if (!await ColorTable.TableExists())
         {
-            while (!AllDataIsFilled())
-            {
-                BaseFolderTable.GetMissingData();
-                ColorTable.GetMissingData();
-                TagTable.GetMissingData();
-            }
+            ColorTable.CreateTable();
+            DefaultColors.AddDefaultColors(ColorTable);
+        }
+        else
+        {
+            //ColorTable.GetList();
         }
 
-        public static bool AllDataIsFilled()
+        if (!await TagTable.TableExists())
         {
-            return BaseFolderTable.DataIsFilled && ColorTable.DataIsFilled && TagTable.DataIsFilled;
+            TagTable.CreateTable();
+            SystemTags.AddSystemTags();
         }
 
-        public static void InitPost()
+        TagTable.GetList();
+        GetMissingTableData();
+    }
+
+    public static void GetMissingTableData()
+    {
+        while (!AllDataIsFilled())
         {
-            // Do something
+            BaseFolderTable.GetMissingData();
+            ColorTable.GetMissingData();
+            TagTable.GetMissingData();
         }
+
+        WeakReferenceMessenger.Default.Send(new ListLoadingStatusChanged(true));
+    }
+
+    public static bool AllDataIsFilled()
+    {
+        return BaseFolderTable.DataIsFilled && ColorTable.DataIsFilled && TagTable.DataIsFilled;
+    }
+
+    public static void InitPost()
+    {
+        // Do something
     }
 }
+
+public class ListLoadingStatusChanged(bool completed) : ValueChangedMessage<bool>(completed);

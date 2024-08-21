@@ -12,15 +12,20 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using CommunityToolkit.Mvvm.ComponentModel;
+using TagExplorer.Models;
+using TagExplorer.ViewModels;
 
 namespace TagExplorer.Views
 {
     /// <summary>
-    /// Interaction logic for Tabs_V.xaml
+    /// Interaction logic for Tag_V.xaml
     /// </summary>
-    public partial class Tabs_V : UserControl
+    public partial class Tag_V
     {
-        public Tabs_V()
+        public Tag Tag;
+
+        public Tag_V()
         {
             InitializeComponent();
         }

@@ -87,7 +87,7 @@
                         Kind="TagOutline"
                         Margin="5" />
                 </Grid>
-                <views:Tabs_V Grid.Row="1" />
+                <views:Tags_V Grid.Row="1" />
             </Grid>
             <GridSplitter 
             Style="{StaticResource MaterialDesignGridSplitter}"

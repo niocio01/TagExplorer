@@ -100,3 +100,4 @@ public static class DBConnector
         return new NpgsqlConnection(_connectionString);
     }
 }
+
