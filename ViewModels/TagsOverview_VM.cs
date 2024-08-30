@@ -20,7 +20,7 @@ public partial class TagsOverview_VM : ObservableObject
 
     public TagsOverview_VM()
     {
-        SelectedTag = TagTable.Data.FirstOrDefault();
+        SelectedTag = null;
 
         TagsVMs = new ObservableCollection<Tag_VM>();
 
@@ -30,6 +30,11 @@ public partial class TagsOverview_VM : ObservableObject
             {
                 UpdateTagsVMs();
             }
+        });
+
+        WeakReferenceMessenger.Default.Register<TagSelected>(this, (r, m) =>
+        {
+            SelectedTag = m.Value;
         });
     }
 

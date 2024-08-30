@@ -11,7 +11,7 @@
         Style="{StaticResource MaterialDesignWindow}"
         TextElement.Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
         Background="{DynamicResource MaterialDesign.Brush.Background}"
-        Title="TagExplorer" Height="450" Width="800">
+        Title="TagExplorer" Height="800" Width="1200">
     <Window.DataContext>
         <viewModels:MainWindow_VM />
     </Window.DataContext>
@@ -56,74 +56,63 @@
                 </Button>
             </StatusBarItem>
         </StatusBar>
-        <Grid>
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
-            <Grid Grid.Column="0">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
-                </Grid.RowDefinitions>
-                <Grid Grid.Row="0" Margin="0 5 0 0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-                    <TextBlock
-                        Grid.Column="1"
-                        Style="{StaticResource MaterialDesignHeadline5TextBlock}"
-                        Text="Tags" 
-                        VerticalAlignment="Center"/>
-                    <materialDesign:PackIcon
-                        VerticalAlignment="Center"
-                        Grid.Column="2"
-                        Height="22"
-                        Width="22"
-                        Kind="TagOutline"
-                        Margin="5" />
-                </Grid>
-                <views:Tags_V Grid.Row="1" />
-            </Grid>
-            <GridSplitter 
-            Style="{StaticResource MaterialDesignGridSplitter}"
-            Grid.Column="1"
-            HorizontalAlignment="Center"
-            VerticalAlignment="Stretch"
-            ShowsPreview="True"
-            Width="5" />
-            <Grid Grid.Column="2" Margin="0 5 0 0">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
-                <Grid Grid.Row="0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock
-                        Grid.Column="1"
-                        VerticalAlignment="Center"
-                        Style="{StaticResource MaterialDesignHeadline5TextBlock}"
-                        HorizontalAlignment="Center"
-                        Text="Files" />
-                    <materialDesign:PackIcon
-                        VerticalAlignment="Center"
-                        Grid.Column="2"
-                        Height="22"
-                        Width="22"
-                        Kind="FileOutline"
-                        Margin="5" />
-                </Grid>
-                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"></ScrollViewer>
-            </Grid>
-        </Grid>
+        <TabControl
+            materialDesign:ColorZoneAssist.Background="{DynamicResource MaterialDesignCardBackground}"
+            materialDesign:ColorZoneAssist.Foreground="{DynamicResource MaterialDesign.Brush.Primary.Dark}"
+            materialDesign:ColorZoneAssist.Mode="Custom"
+            Style="{StaticResource MaterialDesignFilledTabControl}" >
+            <TabItem>
+                <TabItem.Header>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock
+                            Grid.Column="1"
+                            VerticalAlignment="Center"
+                            Style="{StaticResource MaterialDesignHeadline6TextBlock}"
+                            HorizontalAlignment="Center"
+                            Text="Files" />
+                        <materialDesign:PackIcon
+                            VerticalAlignment="Center"
+                            Grid.Column="2"
+                            Height="18"
+                            Width="18"
+                            Kind="FileOutline"
+                            Margin="5" />
+                    </Grid>
+                </TabItem.Header>
+            </TabItem>
+            <TabItem>
+                <TabItem.Header>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock
+                            Grid.Column="1"
+                            Style="{StaticResource MaterialDesignHeadline6TextBlock}"
+                            Text="Tags"
+                            VerticalAlignment="Center" />
+                        <materialDesign:PackIcon
+                            VerticalAlignment="Center"
+                            Grid.Column="2"
+                            Height="18"
+                            Width="18"
+                            Kind="TagOutline"
+                            Margin="5" />
+                    </Grid>
+                </TabItem.Header>
+                <views:Tags_V />
+
+
+            </TabItem>
+        </TabControl>
     </DockPanel>
 </Window>
