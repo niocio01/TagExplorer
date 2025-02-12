@@ -7,7 +7,8 @@
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
              xmlns:viewModels="clr-namespace:TagExplorer.ViewModels"
              mc:Ignorable="d" 
-             d:DesignHeight="60" d:DesignWidth="120">
+             d:DesignHeight="60" d:DesignWidth="120"
+             d:DataContext="{d:DesignInstance Type=viewModels:Tag_VM, IsDesignTimeCreatable=True}">
 
     <UserControl.Resources>
         <Style x:Key="Style" TargetType="materialDesign:Chip" BasedOn="{StaticResource MaterialDesignOutlineChip}">
@@ -32,7 +33,8 @@
             ToolTip="{Binding Path=Tag.Description}">
             <materialDesign:Chip.Icon>
                 <materialDesign:PackIcon
-                    Kind="{Binding Path=Tag.Icon}" />
+                    Kind="{Binding Path=Tag.IconName}"
+                    d:Kind="numeric1CircleOutline"/>
             </materialDesign:Chip.Icon>
         </materialDesign:Chip>
 

@@ -3,10 +3,11 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using TagExplorer.Data;
 
 namespace TagExplorer.Models;
 
-internal class ManualTagAssignment : ITableObject
+internal class ManualTagAssignment
 {
     public int? Id { get; set; }
     public Tag? Tag { get; private set; }

@@ -1,39 +1,20 @@
-﻿using System.Text;
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
+﻿using System.Windows;
 using System.Windows.Interop;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
-using TagExplorer.ViewModels;
-using TagExplorer.Views;
 
-namespace TagExplorer
+namespace TagExplorer.Views;
+
+public partial class MainWindow : Window
 {
-    /// <summary>
-    /// Interaction logic for MainWindow.xaml
-    /// </summary>
-    public partial class MainWindow : Window
+    public MainWindow()
     {
-        public MainWindow()
-        {
-            Main.InitPre();
+        InitializeComponent();
+    }
 
-            InitializeComponent();
+    protected override void OnSourceInitialized(EventArgs e)
+    {
+        base.OnSourceInitialized(e);
 
-            Main.InitPost();
-        }
-
-        protected override void OnSourceInitialized(EventArgs e)
-        {
-            base.OnSourceInitialized(e);
-
-            HwndSource source = (HwndSource)PresentationSource.FromVisual(this);
-            SetDarkStatusbar.UseImmersiveDarkMode(source.Handle, true);
-        }
+        HwndSource source = (HwndSource)PresentationSource.FromVisual(this);
+        SetDarkStatusbar.UseImmersiveDarkMode(source.Handle, true);
     }
 }

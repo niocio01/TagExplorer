@@ -8,6 +8,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
 using CommunityToolkit.Mvvm.Messaging.Messages;
+using TagExplorer.Data;
 using TagExplorer.Models;
 
 namespace TagExplorer.ViewModels;
@@ -16,6 +17,8 @@ public partial class Tag_VM : ObservableObject
 {
     [ObservableProperty] private Tag _tag;
     [ObservableProperty] private bool _isSelected;
+
+    public Tag_VM() {}
 
     public Tag_VM(Tag tag)
     {

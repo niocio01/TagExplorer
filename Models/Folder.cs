@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace TagExplorer.Models;
 
-public class Folder : ITableObject
+public class Folder
 {
     public int? Id { get; set; }
     public string? Name { get; private set; }

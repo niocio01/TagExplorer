@@ -1,10 +1,8 @@
 ﻿using System.Collections.ObjectModel;
-using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using TagExplorer.Models;
 using Microsoft.WindowsAPICodePack.Dialogs;
-using System.Windows.Shapes;
 using Path = System.IO.Path;
 
 namespace TagExplorer.ViewModels;
@@ -15,7 +13,7 @@ public partial class BaseFolderSelector_VM : ObservableObject
 
     public BaseFolderSelector_VM()
     {
-        BaseFolders = Main.BaseFolderTable.Data;
+        // BaseFolders = Main.BaseFolderTable.Data;
     }
 
     [RelayCommand]
@@ -34,6 +32,6 @@ public partial class BaseFolderSelector_VM : ObservableObject
     [RelayCommand]
     public void SaveSettings()
     {
-        DBConnector.SaveBaseFolders();
+        
     }
 }

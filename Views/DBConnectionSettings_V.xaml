@@ -4,14 +4,12 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:TagExplorer.Views"
-             xmlns:c="clr-namespace:TagExplorer.Converters"
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800"
              TextElement.Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
              Background="{DynamicResource MaterialDesign.Brush.Background}">
     <UserControl.Resources>
-        <c:DBConnectionStateToMaterialIconConverter x:Key="CheckConnectionIconConverter" />
     </UserControl.Resources>
     <StackPanel>
         <StackPanel.Resources>
@@ -60,7 +58,7 @@
                     Width="20"
                     Height="20"
                     Foreground="{DynamicResource MaterialDesign.Brush.Secondary.Foreground}"
-                    Kind="{Binding Path=DBConnectionTestState, Converter={StaticResource CheckConnectionIconConverter}}"
+                    Kind="{Binding Path=DBConnectionTestState}"
                 />
             </StackPanel>
             

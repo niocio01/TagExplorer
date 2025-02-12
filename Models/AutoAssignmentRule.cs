@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace TagExplorer.Models;
 
-internal class AutoAssignmentRule : ITableObject
+internal class AutoAssignmentRule
 {
     public int? Id { get; set; }
 

@@ -13,6 +13,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
 using CommunityToolkit.Mvvm.ComponentModel;
+using TagExplorer.Data;
 using TagExplorer.Models;
 using TagExplorer.ViewModels;
 

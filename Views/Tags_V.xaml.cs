@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Microsoft.Extensions.DependencyInjection;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -12,6 +13,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using TagExplorer.ViewModels;
 
 namespace TagExplorer.Views
 {
@@ -23,6 +25,13 @@ namespace TagExplorer.Views
         public Tags_V()
         {
             InitializeComponent();
+                
+            DataContext = App.AppHost!.Services.GetRequiredService<TagsOverview_VM>();
+        }
+
+        private void UserControl_Loaded(object sender, RoutedEventArgs e)
+        {
+
         }
     }
 }

@@ -7,16 +7,22 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
 using CommunityToolkit.Mvvm.Messaging.Messages;
+using TagExplorer.Data;
 using TagExplorer.Views;
 
 namespace TagExplorer.ViewModels;
 
 internal partial class MainWindow_VM : ObservableObject
 {
-    SettingsWindow_V? SettingsWindow;
-    public MainWindow_VM()
+
+    private SettingsWindow_V? SettingsWindow;
+    private AppDbContext _db;
+
+    public MainWindow_VM() { } // For design time
+
+    public MainWindow_VM(AppDbContext db)
     {
-        
+        _db = db;
     }
 
     [RelayCommand]
