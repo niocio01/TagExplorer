@@ -10,7 +10,7 @@ namespace TagExplorer.Models;
 internal class AutoTagAssignment
 {
     public int? Id { get; set; }
-    public Tag? Tag { get; private set; }
+    public TagDTO? TagDto { get; private set; }
     public AutoAssignmentRule? AutoAssignmentRule { get; private set; }
 
     public AutoTagAssignment(int id)
@@ -18,10 +18,10 @@ internal class AutoTagAssignment
         Id = id;
     }
 
-    public AutoTagAssignment(int id, Tag tag, AutoAssignmentRule rule)
+    public AutoTagAssignment(int id, TagDTO tagDto, AutoAssignmentRule rule)
     {
         Id = id;
-        Tag = tag;
+        TagDto = tagDto;
         AutoAssignmentRule = rule;
     }
 }

@@ -29,7 +29,7 @@ namespace TagExplorer
                 })
                 .ConfigureServices((hostContext, services) =>
                 {
-                    services.AddSingleton<MainWindow_VM>();
+                    services.AddScoped<MainWindow_VM>();
                     services.AddSingleton<MainWindow>(s => new MainWindow()
                     {
                         DataContext = s.GetRequiredService<MainWindow_VM>()

@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Microsoft.Extensions.DependencyInjection;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -12,21 +13,25 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
-using CommunityToolkit.Mvvm.ComponentModel;
-using TagExplorer.Data;
-using TagExplorer.Models;
 using TagExplorer.ViewModels;
 
 namespace TagExplorer.Views
 {
     /// <summary>
-    /// Interaction logic for Tag_V.xaml
+    /// Interaction logic for Tags_V.xaml
     /// </summary>
-    public partial class Tag_V
+    public partial class TagsOverview_V : UserControl
     {
-        public Tag_V()
+        public TagsOverview_V()
         {
             InitializeComponent();
+                
+            DataContext = App.AppHost!.Services.GetRequiredService<TagsOverview_VM>();
+        }
+
+        private void UserControl_Loaded(object sender, RoutedEventArgs e)
+        {
+
         }
     }
 }

@@ -10,7 +10,7 @@ namespace TagExplorer.Models;
 internal class ManualTagAssignment
 {
     public int? Id { get; set; }
-    public Tag? Tag { get; private set; }
+    public TagDTO? TagDto { get; private set; }
     public Folder? Folder { get; private set; }
 
     public ManualTagAssignment(int id)
@@ -18,16 +18,16 @@ internal class ManualTagAssignment
         Id = id;
     }
 
-    public ManualTagAssignment(Tag tag, Folder folder)
+    public ManualTagAssignment(TagDTO tagDto, Folder folder)
     {
-        Tag = tag;
+        TagDto = tagDto;
         Folder = folder;
     }
 
-    public ManualTagAssignment(int id, Tag tag, Folder folder)
+    public ManualTagAssignment(int id, TagDTO tagDto, Folder folder)
     {
         Id = id;
-        Tag = tag;
+        TagDto = tagDto;
         Folder = folder;
     }
 }

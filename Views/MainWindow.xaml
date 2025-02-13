@@ -109,7 +109,7 @@
                             Margin="5" />
                     </Grid>
                 </TabItem.Header>
-                <views:Tags_V x:Name="TagsOverview" />
+                <views:TagsOverview_V x:Name="TagsOverview" />
 
 
             </TabItem>

@@ -1,5 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -13,20 +12,17 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
-using TagExplorer.ViewModels;
 
 namespace TagExplorer.Views
 {
     /// <summary>
-    /// Interaction logic for Tags_V.xaml
+    /// Interaction logic for ColorButton_V.xaml
     /// </summary>
-    public partial class Tags_V : UserControl
+    public partial class ColorButton_V : UserControl
     {
-        public Tags_V()
+        public ColorButton_V()
         {
             InitializeComponent();
-                
-            DataContext = App.AppHost!.Services.GetRequiredService<TagsOverview_VM>();
         }
 
         private void UserControl_Loaded(object sender, RoutedEventArgs e)
