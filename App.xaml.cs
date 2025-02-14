@@ -45,6 +45,8 @@ namespace TagExplorer
             var db = AppHost.Services.GetRequiredService<AppDbContext>();
             SystemColors.UpdateDefaultColors(db);
             SystemTags.UpdateSystemTags(db);
+
+
         }
 
         protected override async void OnStartup(StartupEventArgs e)

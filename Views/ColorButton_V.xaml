@@ -13,6 +13,7 @@
             BorderThickness="0"
             Height="20" Width="20"
             Command="{Binding Path=SelectColorCommand}"
+            ToolTip="{Binding Path=Color.Name}"
             Padding="0"
             Margin="2"
             Background="Transparent">

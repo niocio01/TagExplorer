@@ -14,7 +14,7 @@
         <Style x:Key="Style" TargetType="materialDesign:Chip" BasedOn="{StaticResource MaterialDesignOutlineChip}">
             <Style.Triggers>
                 <DataTrigger Binding="{Binding Path=IsSelected}" Value="True">
-                    <Setter Property="BorderBrush" Value="{Binding Path=Tag.Color.HexCode}" />
+                    <Setter Property="BorderBrush" Value="{Binding Path=Color.HexCode}" />
                 </DataTrigger>
                 <DataTrigger Binding="{Binding Path=IsSelected}" Value="False">
                     <Setter Property="BorderBrush" Value="{DynamicResource MaterialDesign.Brush.Chip.OutlineBorder}" />
@@ -24,11 +24,11 @@
     </UserControl.Resources>
     <Grid>
         <materialDesign:Chip
-            Content="{Binding Path=Tag.Name}"
+            Content="{Binding Path=Name}"
             d:Content="Tag Name"
-            IconBackground="{Binding Path=Tag.Color.HexCode}"
+            IconBackground="{Binding Path=Color.HexCode}"
             d:IconBackground="#FF0000"
-            Command="{Binding Path=SelectTagCommand}"
+            Command="{Binding Path=PressTagCommand}"
             Style="{StaticResource Style}"
             ToolTip="{Binding Path=Tag.Description}">
             <materialDesign:Chip.Icon>

@@ -19,7 +19,7 @@ public class TagDTO
     public Color Color { get; set; }
     
     [Column(TypeName = "varchar(200)")]
-    public string Description { get; set; }
+    public string? Description { get; set; }
 
 
     [Column(TypeName = "varchar(50)")]
@@ -32,12 +32,13 @@ public class TagDTO
     // Parameterless constructor required by EF
     public TagDTO() { }
     
-    public TagDTO(string name, Color color, string description, string iconName, bool isSystemTag = false)
+    public TagDTO(string name, Color color, string? description, List<string>? aliases, string iconName, bool isSystemTag = false)
     {
         Name = name;
         Color = color;
         ColorId = color.Id;
         Description = description;
+        Aliases = aliases;
         IconName = iconName;
         IsSystemTag = isSystemTag;
     }
@@ -72,7 +73,7 @@ public static class SystemTags
         IQueryable<Color> defaultColors = db.Colors.Where(e => e.IsSystemColor == true);
         foreach (SystemTag tag in DefaultTags)
         {
-            db.Add(new TagDTO(tag.Name, defaultColors.First(x => x.Name == tag.ColorName), tag.Description, tag.Icon, true));
+            db.Add(new TagDTO(tag.Name, defaultColors.First(x => x.Name == tag.ColorName), tag.Description, null, tag.Icon, true));
         }
         db.SaveChanges();
 

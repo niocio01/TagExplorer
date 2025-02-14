@@ -28,10 +28,5 @@ namespace TagExplorer.Views
                 
             DataContext = App.AppHost!.Services.GetRequiredService<TagsOverview_VM>();
         }
-
-        private void UserControl_Loaded(object sender, RoutedEventArgs e)
-        {
-
-        }
     }
 }
