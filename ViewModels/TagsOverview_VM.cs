@@ -238,5 +238,14 @@ public partial class TagsOverview_VM : ObservableValidator
         IconName = null;
         Color = null;
     }
+
+    [RelayCommand]
+    public void SelectIconPressed()
+    {
+        IconSelector_V iconSelector = new IconSelector_V();
+        iconSelector.Show();
+
+
+    }
 }
 

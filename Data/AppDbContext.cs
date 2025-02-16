@@ -23,4 +23,5 @@ public class AppDbContext : DbContext
     public DbSet<BaseFolder> BaseFolders { get; set; }
     public DbSet<Color> Colors { get; set; }
     public DbSet<TagDTO> Tags { get; set; }
+    public DbSet<IconFavourite?> IconFavourites { get; set; }
 }

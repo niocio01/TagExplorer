@@ -83,16 +83,37 @@
                     IsEnabled="{Binding Path=EditEnabled}"
                     Orientation="Vertical"
                     TextBlock.Foreground="{DynamicResource MaterialDesignBody}">
-                    <TextBox
-                        Margin="0 5 0 10"
-                        VerticalAlignment="Center"
-                        materialDesign:TextFieldAssist.HasLeadingIcon="False"
-                        materialDesign:HintAssist.Hint="Name"
-                        Text="{Binding Path=Name,
-                            UpdateSourceTrigger=PropertyChanged}"
-                        d:Text="Tag Name"
-                        Style="{StaticResource MaterialDesignFloatingHintTextBox}"
-                    />
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox
+                            Grid.Column="0"
+                            Margin="0 5 0 10"
+                            VerticalAlignment="Center"
+                            materialDesign:TextFieldAssist.HasLeadingIcon="False"
+                            materialDesign:HintAssist.Hint="Name"
+                            Text="{Binding Path=Name,
+                                UpdateSourceTrigger=PropertyChanged}"
+                            d:Text="Tag Name"
+                            Style="{StaticResource MaterialDesignFloatingHintTextBox}"/>
+                        <Button
+                            Grid.Column="2"
+                            Width="32"
+                            Margin="0"
+                            Padding="0"
+                            Command="{Binding SelectIconPressedCommand}"
+                            Background="{Binding Path=Color.HexCode}"
+                            BorderBrush="White">
+                            <materialDesign:PackIcon
+                                HorizontalContentAlignment="Center"
+                                Width="22" Height="22"
+                                Kind="Edit" />
+                        </Button>
+                    </Grid>
+                   
                     <TextBox
                         Margin="0 5 0 0"
                         VerticalAlignment="Center"
