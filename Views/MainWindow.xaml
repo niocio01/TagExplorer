@@ -85,6 +85,7 @@
                             Margin="5" />
                     </Grid>
                 </TabItem.Header>
+                <views:Explorer_V x:Name="Explorer" />
             </TabItem>
             <TabItem>
                 <TabItem.Header>
