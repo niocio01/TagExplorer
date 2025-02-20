@@ -25,7 +25,8 @@ namespace TagExplorer.Views;
 [ObservableObject]
 public partial class IconSelector_V : Window
 {
-    private const int NumOfIconsToDisplay = 50;
+    private const int NumOfIconsToDisplay = 200;
+    private const int InputTimerIntervalMs = 200;
 
     private readonly List<string> _allIconNames = Enum.GetNames(typeof(PackIconKind)).ToList();
 
@@ -38,10 +39,14 @@ public partial class IconSelector_V : Window
     [ObservableProperty] private string? _filterText;
     [ObservableProperty] private bool _favouritesOnly;
 
+    private static System.Timers.Timer _inputFinishedTimer = new(InputTimerIntervalMs);
+
     public IconSelector_V()
     {
         InitializeComponent();
         FilterIcons();
+        _inputFinishedTimer.Elapsed += (sender, args) => Dispatcher.Invoke(FilterIcons);
+        _inputFinishedTimer.AutoReset = false;
     }
 
     protected override void OnSourceInitialized(EventArgs e)
@@ -54,7 +59,9 @@ public partial class IconSelector_V : Window
 
     partial void OnFilterTextChanged(string? value)
     {
-        FilterIcons();
+        // restart the timer
+        _inputFinishedTimer.Stop();
+        _inputFinishedTimer.Start();
     }
 
     partial void OnFavouritesOnlyChanged(bool value)

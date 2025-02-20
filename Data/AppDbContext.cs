@@ -24,4 +24,14 @@ public class AppDbContext : DbContext
     public DbSet<Color> Colors { get; set; }
     public DbSet<TagDTO> Tags { get; set; }
     public DbSet<IconFavourite?> IconFavourites { get; set; }
+
+    public DbSet<FolderBase> Folders { get; set; }
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<FolderBase>()
+            .HasDiscriminator<string>("FolderType")
+            .HasValue<Folder>("Folder")
+            .HasValue<BaseFolder>("BaseFolder");
+    }
 }

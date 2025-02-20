@@ -18,7 +18,8 @@
             Padding="0"
             Margin="0"
             Command="{Binding Path=ButtonClickedCommand, ElementName=Root}"
-            Background="Transparent">
+            Background="Transparent"
+            Foreground="{DynamicResource MaterialDesign.Brush.Foreground}">
             <Button.InputBindings>
                 <MouseBinding
                     Gesture="Shift+LeftClick" Command="{Binding ButtonShiftClickedCommand, ElementName=Root}"/>
@@ -38,11 +39,9 @@
                             </Trigger>
                             <DataTrigger
                                     Binding="{Binding Path=IsFavourite, ElementName=Root}" Value="True">
-                                <Setter Property="Background" Value="#ffea39"/>
+                                <Setter Property="Background" Value="#c4a102"/>
                             </DataTrigger>
                         </Style.Triggers>
-                        
-                            
 
                     </Style>
                 </Border.Style>

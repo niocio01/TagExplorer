@@ -49,21 +49,18 @@
                 Style="{StaticResource MaterialDesignCheckBox}"/>
         </Grid>
 
-        <ItemsControl 
+        <ScrollViewer 
             Grid.Row="4"
-            ItemsSource="{Binding Path=FilteredIcons, ElementName=Root}"
-            Padding="0 2 0 0">
-            <ItemsControl.ItemTemplate>
-                <DataTemplate>
-                    <local:IconButton_V/>
-                </DataTemplate>
-            </ItemsControl.ItemTemplate>
-            <ItemsControl.ItemsPanel>
-                <ItemsPanelTemplate>
-                    <WrapPanel/>
-                </ItemsPanelTemplate>
-            </ItemsControl.ItemsPanel>
-        </ItemsControl>
+            VerticalScrollBarVisibility="Auto">
+            <ItemsControl
+                ItemsSource="{Binding Path=FilteredIcons, ElementName=Root}"
+                Padding="0 2 0 0">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+            </ItemsControl></ScrollViewer>
 
     </Grid>
 </Window>
