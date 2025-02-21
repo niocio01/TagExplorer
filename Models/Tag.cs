@@ -2,6 +2,7 @@
 using CommunityToolkit.Mvvm.Input;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Windows;
 using TagExplorer.Data;
 
 namespace TagExplorer.Models;

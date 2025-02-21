@@ -10,7 +10,7 @@
      mc:Ignorable="d"
      TextElement.Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
      Background="{DynamicResource MaterialDesign.Brush.Background}"
-     d:DesignHeight="800" d:DesignWidth="1200">
+     d:DesignHeight="800" d:DesignWidth="1500">
     <UserControl.DataContext>
         <viewModels:Explorer_VM />
     </UserControl.DataContext>
@@ -148,34 +148,88 @@
             </Grid.ColumnDefinitions>
 
             <Grid Name="Filters"
-                Margin="10"
                 Grid.Column="0">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
                 <TextBlock
                     Grid.Row="0"
+                    Margin="10 10 10 0"
                     Style="{StaticResource MaterialDesignHeadline5TextBlock}"
                     Text="Filters"
                     HorizontalAlignment="Center"/>
                 <TextBlock
                     Grid.Row="1"
+                    Margin="10 0 10 5"
                     Style="{StaticResource MaterialDesignBody1TextBlock}"
                     Text="Tags"/>
                 <ScrollViewer 
-                    Grid.Row="3" VerticalScrollBarVisibility="Auto">
+                    Grid.Row="3" 
+                    Margin="10 0 10 0"
+                    VerticalScrollBarVisibility="Auto">
                     <ItemsControl
                         ItemsSource="{Binding Path=FilterTags}"
                         d:ItemsSource="{d:SampleData ItemCount=5}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
                                 <local:Tag_V2 DataContext="{Binding}" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                    </ItemsControl>
+                </ScrollViewer>
+
+                <GridSplitter 
+                    ResizeDirection="Rows"
+                    Margin="0 10 0 10"
+                    Grid.Row="4" Height="3" HorizontalAlignment="Stretch" />
+
+                <TextBlock
+                    Grid.Row="5"
+                    Margin="10 0 10 5"
+                    Style="{StaticResource MaterialDesignBody1TextBlock}"
+                    Text="FileType"/>
+                <ScrollViewer 
+                    Grid.Row="6" VerticalScrollBarVisibility="Auto">
+                    <ItemsControl
+                        ItemsSource="{Binding Path=FilterFileTypes}"
+                        d:ItemsSource="{d:SampleData ItemCount=10}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Button
+                                    Height="55"
+                                    Width="50"
+                                    Margin="5"
+                                    Padding="0 5 0 0"
+                                    Style="{StaticResource MaterialDesignFlatLightButton}"
+                                    ToolTip="{Binding Path=DisplayString}"
+                                    Foreground="{StaticResource MaterialDesign.Brush.Foreground}">
+                                    <StackPanel
+                                        Orientation="Vertical">
+                                        <materialDesign:PackIcon
+                                            Kind="{Binding Path=IconString}"
+                                            Width="25" Height="25"
+                                            Padding="0"
+                                            Margin="0 0 0 -2"
+                                            HorizontalAlignment="Center" />
+                                        <TextBlock 
+                                            Style="{StaticResource MaterialDesignBody1TextBlock}"
+                                            Text="{Binding Path=Extension}"
+                                            HorizontalAlignment="Center"
+                                            d:Text="ext"/>
+                                    </StackPanel>
+                                </Button>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                         <ItemsControl.ItemsPanel>

@@ -1,4 +1,8 @@
-﻿namespace TagExplorer.Views
+﻿using CommunityToolkit.Mvvm.Input;
+using System.Windows;
+using TagExplorer.Models;
+
+namespace TagExplorer.Views
 {
     /// <summary>
     /// Interaction logic for Tag_V.xaml

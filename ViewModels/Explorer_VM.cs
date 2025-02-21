@@ -44,6 +44,11 @@ public partial class Explorer_VM : ObservableObject
     [ObservableProperty] 
     private ObservableCollection<FilterTag> _filterTags;
 
+    [ObservableProperty]
+    private ObservableCollection<FileType> _filterFileTypes;
+
+
+
     private AppDbContext _db;
 
     public Explorer_VM()
@@ -61,6 +66,12 @@ public partial class Explorer_VM : ObservableObject
         foreach (TagDTO tagDTO in dtoTags)
         {
             FilterTags.Add(new FilterTag(tagDTO));
+        }
+
+        FilterFileTypes = new ObservableCollection<FileType>();
+        foreach (FileType fileType in FileTypes.Types)
+        {
+            FilterFileTypes.Add(fileType);
         }
 
         SetCurrentPathToHome();
