@@ -15,50 +15,129 @@
         <viewModels:Explorer_VM />
     </UserControl.DataContext>
         <UserControl.Resources>
-        <c:InverseBooleanConverter x:Key="InverseBool"/>
-        <c:BooleanToString x:Key="BoolToEditModeString" TrueString="New Tag" FalseString="Edit Tag"/>
-        <c:BooleanToString x:Key="BoolToSaveButtonString" TrueString="Create Tag" FalseString="Save Changes"/>
-    </UserControl.Resources>
+        <Style TargetType="Button" BasedOn="{StaticResource MaterialDesignFlatLightButton}">
+            <Setter Property="Foreground" Value="{DynamicResource MaterialDesign.Brush.Foreground}"/>
+            </Style>
+            <c:InverseBooleanConverter x:Key="InverseBool"/>
+            <BooleanToVisibilityConverter x:Key="BooleanToVisibility" />
+            <c:FolderToBreadcrumbIconConverter x:Key="BreadcrumbIconConverter" />
+        </UserControl.Resources>
     <Grid>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*" MinWidth="150"/>
-            <ColumnDefinition Width="Auto"/>
-            <ColumnDefinition Width="*"/>
-        </Grid.ColumnDefinitions>
-            
-        <ListBox
-            ScrollViewer.VerticalScrollBarVisibility="Auto"
-            SelectedItem="{Binding SelectedItem}"
-            ItemsSource="{Binding Path=CurrentFolderItems}">
-            <ListBox.ItemTemplate>
-                <DataTemplate>
-                    <StackPanel
-                        Orientation="Horizontal">
-                        <materialDesign:PackIcon
-                            Kind="{Binding Path=IconString}"
-                            Margin="0 0 10 0" />
-                        <TextBlock
-                            Text="{Binding Path=Name}"
-                            d:Text="Item text that is fairly long.txt"
-                            Style="{StaticResource MaterialDesignBody2TextBlock}" />
-                    </StackPanel>
-                </DataTemplate>
-            </ListBox.ItemTemplate>
-        </ListBox>
-            
-        
-        <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Center" />
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
 
-        <Grid Grid.Column="2"
-              Margin="10">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
-                <RowDefinition Height="Auto"/>
-            </Grid.RowDefinitions>
+        <StackPanel 
+            Grid.Row="0"
+            Margin="5 0 0 0"
+            Orientation="Horizontal">
+            <Button
+                Background="Transparent"
+                BorderBrush="Transparent"
+                BorderThickness="0"
+                VerticalContentAlignment="Center"
+                Margin="0 0 -5 0"
+                Padding="5"
+                Command="{Binding Path=BreadcrumbHomeClickedCommand}">
+                <materialDesign:PackIcon
+                    Grid.Column="0"
+                    Kind="HomeOutline"
+                    Width="20" Height="20"
+                    Padding="0"
+                    Margin="0 0 0 0"
+                    VerticalAlignment="Center" />
+            </Button>
+            <ItemsControl
+                Padding="5 4 5 4"
+                Grid.Row="0"
+                x:Name="Breadcrumb"
+                ItemsSource="{Binding Breadcrumbs}"
+                d:ItemsSource="{d:SampleData ItemCount=5}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Orientation="Horizontal" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <materialDesign:PackIcon
+                                Grid.Column="0"
+                                Kind="ChevronRight"
+                                Visibility="{Binding Path=HasParentFolder, Converter={StaticResource BooleanToVisibility}}"
+                                Width="20" Height="20"
+                                Padding="0"
+                                Margin="0 0 0 0"
+                                VerticalAlignment="Center" />
+                            <Button
+                                Grid.Column="1"
+                                Background="Transparent"
+                                BorderBrush="Transparent"
+                                BorderThickness="0"
+                                VerticalContentAlignment="Center"
+                                Margin="0"
+                                Padding="5"
+                                CommandParameter="{Binding .}"
+                                Command="{Binding Path=DataContext.BreadcrumbClickCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                Content="{Binding Name}" />
+                        </Grid>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+        <Rectangle
+            Fill="{DynamicResource MaterialDesignLightSeparatorBackground}"
+            Height="2"
+            Grid.Row="1"
+            Margin="0"/>
+        <Grid
+            Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" MinWidth="150" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <ListBox
+                ScrollViewer.VerticalScrollBarVisibility="Auto"
+                SelectedItem="{Binding SelectedItem}"
+                ItemsSource="{Binding Path=CurrentFolderItems}" 
+                d:ItemsSource="{d:SampleData ItemCount=5}">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel
+                            Orientation="Horizontal">
+                            <materialDesign:PackIcon
+                                Kind="{Binding Path=IconString}"
+                                Margin="0 0 10 0" />
+                            <TextBlock
+                                Text="{Binding Path=Name}"
+                                d:Text="Item text that is fairly long.txt"
+                                Style="{StaticResource MaterialDesignBody2TextBlock}" />
+                        </StackPanel>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+
+
+            <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Center" />
+
+            <Grid Grid.Column="2"
+                  Margin="10">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
 
                 <Button
                     Grid.Column="2"
@@ -75,7 +154,8 @@
                         Width="20" Height="20"
                         Kind="Delete" />
                 </Button>
-            
+
+            </Grid>
         </Grid>
     </Grid>
 </UserControl>
