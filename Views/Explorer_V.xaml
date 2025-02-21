@@ -40,14 +40,51 @@
                 VerticalContentAlignment="Center"
                 Margin="0 0 -5 0"
                 Padding="5"
-                Command="{Binding Path=BreadcrumbHomeClickedCommand}">
+                IsEnabled="{Binding Path=GoBackAvailable}"
+                Command="{Binding Path=GoBackCommand}">
                 <materialDesign:PackIcon
-                    Grid.Column="0"
-                    Kind="HomeOutline"
+                    Kind="ArrowLeft"
                     Width="20" Height="20"
                     Padding="0"
                     Margin="0 0 0 0"
                     VerticalAlignment="Center" />
+            </Button>
+            <Button
+                Background="Transparent"
+                BorderBrush="Transparent"
+                BorderThickness="0"
+                VerticalContentAlignment="Center"
+                Margin="0 0 -5 0"
+                Padding="5"
+                IsEnabled="{Binding Path=GoForwardAvailable}"
+                Command="{Binding Path=GoForwardCommand}">
+                <materialDesign:PackIcon
+                    Kind="ArrowRight"
+                    Width="20" Height="20"
+                    Padding="0"
+                    Margin="0 0 0 0"
+                    VerticalAlignment="Center" />
+            </Button>
+            <Rectangle
+                Fill="{DynamicResource MaterialDesignLightSeparatorBackground}"
+                Width="2"
+                Grid.Row="1"
+                Margin="10 0 5 0"/>
+            <Button
+            Background="Transparent"
+            BorderBrush="Transparent"
+            BorderThickness="0"
+            VerticalContentAlignment="Center"
+            Margin="0 0 -5 0"
+            Padding="5"
+            Command="{Binding Path=BreadcrumbHomeClickedCommand}">
+            <materialDesign:PackIcon
+                Grid.Column="0"
+                Kind="HomeOutline"
+                Width="20" Height="20"
+                Padding="0"
+                Margin="0 0 0 0"
+                VerticalAlignment="Center" />
             </Button>
             <ItemsControl
                 Padding="5 4 5 4"
@@ -114,8 +151,10 @@
                         <StackPanel
                             Orientation="Horizontal">
                             <materialDesign:PackIcon
+                                Height="20" Width="20"
                                 Kind="{Binding Path=IconString}"
-                                Margin="0 0 10 0" />
+                                Padding="0"
+                                Margin="0 -3 10 0" />
                             <TextBlock
                                 Text="{Binding Path=Name}"
                                 d:Text="Item text that is fairly long.txt"

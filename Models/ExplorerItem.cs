@@ -14,14 +14,24 @@ public static class ExplorerItemProperties
         { "exe", "Application" },
         { "txt", "FileDocument" },
         { "docx", "FileWordBox" },
+        { "xlsx", "FileExcelBox"},
         { "pdf", "FilePdfBox"},
         { "jpg", "FileJpgBox" },
         { "png", "FilePngBox" },
+        { "svg", "FilePngBox" },
         { "mp4", "Video" },
         { "mp3", "MusicBox" },
         { "wav", "MusicBox" },
         { "zip", "ZipBox" },
         { "rar", "ZipBox" },
+        { "stl", "printer3D" },
+        { "3mf", "printer3D" },
+        { "sldprt", "FileCadBox" },
+        { "sldasm", "FileCadBox" },
+        { "git", "gitignore" },
+        { "md", "languageMarkdown"},
+        { "json", "codeJson" },
+        { "tex", "FormatText" },
     };
 }
 
@@ -83,9 +93,15 @@ public class File : ExplorerItem
     public File(string name, string fileExtension)
     {
         Name = name;
-
-        ExplorerItemProperties.Symbols.TryGetValue(fileExtension, out string? symbol);
-
-        IconString = symbol ?? "help";
+        try
+        {
+            ExplorerItemProperties.Symbols.TryGetValue(fileExtension[1..].ToLower(), out string? symbol);
+            IconString = symbol ?? "help";
+        }
+        catch (Exception e)
+        {
+            IconString = "help";
+        }
+        
     }
 }
