@@ -1,0 +1,48 @@
+﻿<UserControl x:Class="TagExplorer.Views.Tag_V2"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:TagExplorer.Views"
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+             xmlns:models="clr-namespace:TagExplorer.Models"
+             mc:Ignorable="d" 
+             d:DesignHeight="60" d:DesignWidth="120"
+             d:DataContext="{d:DesignInstance Type=models:FilterTag, IsDesignTimeCreatable=True}">
+
+    <UserControl.Resources>
+        <Style x:Key="Style" TargetType="materialDesign:Chip" BasedOn="{StaticResource MaterialDesignOutlineChip}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Path=FilterType}" Value="MustHave">
+                    <Setter Property="BorderBrush" Value="{DynamicResource MaterialDesign.Brush.Primary}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Path=FilterType}" Value="MustNotHave">
+                    <Setter Property="BorderBrush" Value="{DynamicResource MaterialDesign.Brush.Secondary}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Path=FilterType}" Value="null">
+                    <Setter Property="BorderBrush" Value="{DynamicResource MaterialDesign.Brush.Chip.OutlineBorder}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+    <Grid>
+        <materialDesign:Chip
+            Content="{Binding Path=Name}"
+            d:Content="Tag Name"
+            IconBackground="{Binding Path=Color.HexCode}"
+            d:IconBackground="#FF0000"
+            Command="{Binding Path=ToggleMustHaveFilterCommand}"
+            Style="{StaticResource Style}"
+            ToolTip="{Binding Path=Description}">
+            <materialDesign:Chip.InputBindings>
+                <MouseBinding Gesture="RightClick" Command="{Binding ToggleMustNotHaveFilterCommand}" />
+            </materialDesign:Chip.InputBindings>
+            <materialDesign:Chip.Icon>
+                <materialDesign:PackIcon
+                    Kind="{Binding Path=IconName}"
+                    d:Kind="numeric1CircleOutline"/>
+            </materialDesign:Chip.Icon>
+        </materialDesign:Chip>
+
+    </Grid>
+</UserControl>

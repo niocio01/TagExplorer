@@ -39,5 +39,12 @@ namespace TagExplorer.Views
                     break;
             }
         }
+
+        private void ListBoxItem_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            // sender and e are not used
+            // we can get the item from the selected item on the listbox
+            _vm.OnItemDoubleClicked();
+        }
     }
 }

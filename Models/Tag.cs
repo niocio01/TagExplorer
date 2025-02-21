@@ -1,11 +1,24 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using TagExplorer.Data;
 
 namespace TagExplorer.Models;
 
-public partial class Tag : ObservableValidator
+public interface ITag
+{
+    string? Name { get; set; }
+    Color? Color { get; set; }
+    string? Description { get; set; }
+    string? IconName { get; set; }
+    Tag? Parent { get; set; }
+    List<Tag>? Children { get; set; }
+    List<string>? Aliases { get; set; }
+    bool IsSystemTag { get; set; }
+}
+
+public partial class Tag : ObservableValidator, ITag
 {
     public readonly TagDTO? DTO;
 
@@ -50,5 +63,56 @@ public partial class Tag : ObservableValidator
     {
         ValidateAllProperties();
         return !HasErrors;
+    }
+}
+
+public partial class FilterTag : ObservableObject,  ITag
+{
+    public enum FilterTypes
+    {
+        MustHave,
+        MustNotHave
+    }
+
+    public string? Name { get; set; }
+    public Color? Color { get; set; }
+    public string? Description { get; set; }
+    public string? IconName { get; set; }
+    public Tag? Parent { get; set; }
+    public List<Tag>? Children { get; set; }
+    public List<string>? Aliases { get; set; }
+    public bool IsSystemTag { get; set; }
+
+    [ObservableProperty] 
+    private FilterTypes? _filterType;
+
+    [RelayCommand]
+    public void ToggleMustHaveFilter()
+    {
+        FilterType = FilterType == FilterTypes.MustHave ? null : FilterTypes.MustHave;
+    }
+
+    [RelayCommand]
+    public void ToggleMustNotHaveFilter()
+    {
+        FilterType = FilterType == FilterTypes.MustNotHave ? null : FilterTypes.MustNotHave;
+    }
+
+    public FilterTag(TagDTO tag)
+    {
+        Name = tag.Name;
+        Color = tag.Color;
+        Description = tag.Description;
+        IconName = tag.IconName;
+        Parent = null;
+        Children = [];
+        Aliases = tag.Aliases;
+        IsSystemTag = tag.IsSystemTag;
+        FilterType = null;
+    }
+
+    public FilterTag()
+    {
+        throw new NotImplementedException();
     }
 }

@@ -10,7 +10,7 @@
      mc:Ignorable="d"
      TextElement.Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
      Background="{DynamicResource MaterialDesign.Brush.Background}"
-     d:DesignHeight="450" d:DesignWidth="800">
+     d:DesignHeight="800" d:DesignWidth="1200">
     <UserControl.DataContext>
         <viewModels:Explorer_VM />
     </UserControl.DataContext>
@@ -122,7 +122,11 @@
                                 Padding="5"
                                 CommandParameter="{Binding .}"
                                 Command="{Binding Path=DataContext.BreadcrumbClickCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                Content="{Binding Name}" />
+                                >
+                                <TextBlock
+                                    Text="{Binding Name}"
+                                    d:Text="Folder_Name"/>
+                            </Button>
                         </Grid>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
@@ -136,16 +140,66 @@
         <Grid
             Grid.Row="2">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" MinWidth="150" />
-                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="2*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="2*" />
             </Grid.ColumnDefinitions>
 
-            <ListBox
+            <Grid Name="Filters"
+                Margin="10"
+                Grid.Column="0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <TextBlock
+                    Grid.Row="0"
+                    Style="{StaticResource MaterialDesignHeadline5TextBlock}"
+                    Text="Filters"
+                    HorizontalAlignment="Center"/>
+                <TextBlock
+                    Grid.Row="1"
+                    Style="{StaticResource MaterialDesignBody1TextBlock}"
+                    Text="Tags"/>
+                <ScrollViewer 
+                    Grid.Row="3" VerticalScrollBarVisibility="Auto">
+                    <ItemsControl
+                        ItemsSource="{Binding Path=FilterTags}"
+                        d:ItemsSource="{d:SampleData ItemCount=5}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <local:Tag_V2 DataContext="{Binding}" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                    </ItemsControl>
+                </ScrollViewer>
+            </Grid>
+
+            <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Center" />
+
+            <ListBox Name="FileExplorer"
+                Grid.Column="2"
                 ScrollViewer.VerticalScrollBarVisibility="Auto"
                 SelectedItem="{Binding SelectedItem}"
                 ItemsSource="{Binding Path=CurrentFolderItems}" 
                 d:ItemsSource="{d:SampleData ItemCount=5}">
+                <ListBox.ItemContainerStyle>
+                    <Style TargetType="{x:Type ListBoxItem}" BasedOn="{StaticResource {x:Type ListBoxItem}}">
+                        <EventSetter Event="MouseDoubleClick" Handler="ListBoxItem_MouseDoubleClick"/>
+                    </Style>
+                </ListBox.ItemContainerStyle>
                 <ListBox.ItemTemplate>
                     <DataTemplate>
                         <StackPanel
@@ -158,17 +212,18 @@
                             <TextBlock
                                 Text="{Binding Path=Name}"
                                 d:Text="Item text that is fairly long.txt"
-                                Style="{StaticResource MaterialDesignBody2TextBlock}" />
+                                Style="{StaticResource MaterialDesignBody2TextBlock}" >
+                            </TextBlock>
                         </StackPanel>
                     </DataTemplate>
                 </ListBox.ItemTemplate>
             </ListBox>
 
+            <GridSplitter Grid.Column="3" Width="5" HorizontalAlignment="Center" />
 
-            <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Center" />
-
-            <Grid Grid.Column="2"
-                  Margin="10">
+            <Grid Name="ItemProperties"
+                Grid.Column="4"
+                Margin="10">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
@@ -178,21 +233,36 @@
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
-                <Button
-                    Grid.Column="2"
-                    Width="32"
-                    Margin="0"
-                    Padding="0"
-                    IsEnabled="{Binding Path=SelectedTag.IsSystemTag,
-                        Converter={StaticResource InverseBool}, 
-                        FallbackValue=False}"
-                    Command="{Binding Path=DeleteTagCommand}"
-                    Style="{StaticResource MaterialDesignRaisedButton}">
-                    <materialDesign:PackIcon
-                        HorizontalContentAlignment="Center"
-                        Width="20" Height="20"
-                        Kind="Delete" />
-                </Button>
+                <TextBlock
+                    Grid.Row="0"
+                    Style="{StaticResource MaterialDesignHeadline5TextBlock}"
+                    Text="{Binding Path=SelectedItem.Name, FallbackValue='No Item Selected' }"
+                    d:Text="Explorer Item"
+                    VerticalAlignment="Center"
+                    HorizontalAlignment="Center"/>
+
+                <Expander Grid.Row="2"
+                          HorizontalAlignment="Stretch"
+                          materialDesign:ExpanderAssist.HorizontalHeaderPadding="10,10,10,5"
+                          Header="Child Tags">
+                    <ItemsControl 
+                        ItemsSource="{Binding Path=ItemTags}"
+                        d:ItemsSource="{d:SampleData ItemCount=3}"
+                        Margin="10 10 10 10">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <local:Tag_V DataContext="{Binding}"/>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                    </ItemsControl>
+                </Expander>
+
+
 
             </Grid>
         </Grid>

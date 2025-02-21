@@ -1,5 +1,6 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
@@ -8,6 +9,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Windows.Input;
 using TagExplorer.Data;
 using TagExplorer.Models;
 using File = TagExplorer.Models.File;
@@ -17,6 +19,8 @@ namespace TagExplorer.ViewModels;
 
 public partial class Explorer_VM : ObservableObject
 {
+    public const int HistoryLength = 20;
+
     [ObservableProperty]
     private ObservableCollection<ExplorerItem> _currentFolderItems;
 
@@ -29,15 +33,16 @@ public partial class Explorer_VM : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(GoForwardAvailable), nameof(GoBackAvailable))]
-    
     private int _currentHistoryPosition;
-
-    public const int HistoryLength = 20;
+    
     public bool GoBackAvailable => CurrentHistoryPosition >= 1;
     public bool GoForwardAvailable => CurrentHistoryPosition < BreadcrumbsHistory.Count-1;
 
     [ObservableProperty]
     private ExplorerItem? _selectedItem;
+
+    [ObservableProperty] 
+    private ObservableCollection<FilterTag> _filterTags;
 
     private AppDbContext _db;
 
@@ -49,12 +54,27 @@ public partial class Explorer_VM : ObservableObject
 
         _breadcrumbsHistory = new ObservableCollection<List<Folder>>();
 
+        FilterTags = new ObservableCollection<FilterTag>();
+        List<TagDTO> dtoTags = _db.Tags
+            .Include(tag => tag.Color)
+            .ToList();
+        foreach (TagDTO tagDTO in dtoTags)
+        {
+            FilterTags.Add(new FilterTag(tagDTO));
+        }
+
         SetCurrentPathToHome();
         AddToHistory(Breadcrumbs.ToList());
     }
     
 
     partial void OnSelectedItemChanged(ExplorerItem? value)
+    {
+        
+    }
+
+
+    public void OnItemDoubleClicked()
     {
         if (SelectedItem == null)
         {
@@ -144,6 +164,7 @@ public partial class Explorer_VM : ObservableObject
             BreadcrumbsHistory.RemoveAt(0);
         }
     }
+
 
     [RelayCommand]
     public void BreadcrumbClick(Folder folder)
