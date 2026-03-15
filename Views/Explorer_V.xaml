@@ -169,16 +169,31 @@
                     Grid.Row="1">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <TextBlock
-                        Grid.Column="1"
-                        Margin="10 0 10 5"
+                        Grid.Column="0"
+                        Margin="10 0 0 5"
                         Style="{StaticResource MaterialDesignBody1TextBlock}"
                         Text="Tags"/>
+                    <TextBlock
+                        Grid.Column="1"
+                        Margin="5 0 10 3"
+                        Style="{StaticResource MaterialDesignBody1TextBlock}">
+                        <Run Text="(" />
+                        <Run Text="{Binding RequiredTagFilterCount}"
+                             d:Text="3"
+                             Foreground="LimeGreen" />
+                        <Run Text="/" />
+                        <Run Text="{Binding DisallowedTagFilterCount}"
+                             d:Text="2"
+                             Foreground="Red" />
+                        <Run Text=")" />
+                    </TextBlock>
                     <Button
-                        Grid.Column="2"
+                        Grid.Column="3"
                         Padding="8 0 8 0"
                         Command="{Binding Path=ClearTagsFiltersCommand}">
                         <materialDesign:PackIcon
@@ -193,7 +208,7 @@
                     Margin="10 0 10 0"
                     VerticalScrollBarVisibility="Auto">
                     <ItemsControl
-                        ItemsSource="{Binding Path=FilterTags}"
+                        ItemsSource="{Binding Path=AllFilterTags}"
                         d:ItemsSource="{d:SampleData ItemCount=5}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
@@ -216,16 +231,31 @@
                     Grid.Row="5">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <TextBlock
                     Grid.Column="0"
-                    Margin="10 0 10 5"
+                    Margin="10 0 0 5"
                     Style="{StaticResource MaterialDesignBody1TextBlock}"
                     Text="FileType"/>
+                    <TextBlock
+                        Grid.Column="1"
+                        Margin="5 0 10 3"
+                        Style="{StaticResource MaterialDesignBody1TextBlock}">
+                        <Run Text="(" />
+                        <Run Text="{Binding RequiredExtentionFilterCount}"
+                             d:Text="3"
+                             Foreground="LimeGreen" />
+                        <Run Text="/" />
+                        <Run Text="{Binding DisallowedExtentionFilterCount}"
+                             d:Text="2"
+                             Foreground="Red" />
+                        <Run Text=")" />
+                    </TextBlock>
                     <Button
-                        Grid.Column="2"
+                        Grid.Column="3"
                         Padding="8 0 8 0"
                         Command="{Binding Path=ClearExtentionFiltersCommand}">
                         <materialDesign:PackIcon
@@ -239,7 +269,7 @@
                     VerticalScrollBarVisibility="Auto"
                     d:VerticalScrollBarVisibility="Visible">
                     <ItemsControl
-                        ItemsSource="{Binding Path=FilterExtention_VMs}"
+                        ItemsSource="{Binding Path=AllFilterExtention_VMs}"
                         d:ItemsSource="{d:SampleData ItemCount=10}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>

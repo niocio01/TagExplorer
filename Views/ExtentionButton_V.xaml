@@ -6,6 +6,7 @@
              xmlns:local="clr-namespace:TagExplorer.Views"
              xmlns:viewModels="clr-namespace:TagExplorer.ViewModels"
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+              xmlns:main="clr-namespace:TagExplorer"
              mc:Ignorable="d" 
              d:DesignHeight="60" d:DesignWidth="60"
              d:DataContext="{d:DesignInstance Type=viewModels:ExtentionButton_VM, IsDesignTimeCreatable=True}" Loaded="UserControl_Loaded">
@@ -13,16 +14,22 @@
         <Button
             BorderThickness="0"
             Height="55" Width="50"
-            Command="{Binding Path=SelectFileTypeCommand}"
+            Command="{Binding Path=ToggleRequiredFilterCommand}"
             ToolTip="{Binding Path=FileType.DisplayString}"
             Padding="0"
             Margin="2" >
+            <Button.InputBindings>
+                <MouseBinding Gesture="RightClick" Command="{Binding ToggleDisallowedFilterCommand}" />
+            </Button.InputBindings>
             <Button.Style>
                 <Style TargetType="{x:Type Button}"
                        BasedOn="{StaticResource MaterialDesignFlatLightButton}">
                     <Setter Property="Foreground" Value="{DynamicResource MaterialDesign.Brush.Foreground}" />
                     <Style.Triggers>
-                        <DataTrigger Binding="{Binding Path=IsSelected}" Value="true">
+                        <DataTrigger Binding="{Binding Path=FilterType}" Value="{x:Static main:FilterTypes.Required}">
+                            <Setter Property="Background" Value="{DynamicResource MaterialDesign.Brush.Chip.OutlineBorder}" />
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding Path=FilterType}" Value="{x:Static main:FilterTypes.Disallowed}">
                             <Setter Property="Background" Value="{DynamicResource MaterialDesign.Brush.Chip.OutlineBorder}" />
                         </DataTrigger>
                     </Style.Triggers>
@@ -43,5 +50,6 @@
                     d:Text="extent"/>
             </StackPanel>
         </Button>
+        <local:Filter_V />
     </Grid>
 </UserControl>

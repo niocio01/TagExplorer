@@ -14,12 +14,12 @@ using TagExplorer.Models;
 
 namespace TagExplorer.ViewModels;
 
-public partial class ExtentionButton_VM : ObservableObject
+public partial class ExtentionButton_VM : Filter
 {
     public event EventHandler FileTypeSelected;
 
     [ObservableProperty] private FileType _fileType;
-    [ObservableProperty] private bool _isSelected;
+    
 
     public ExtentionButton_VM() { }
 
@@ -28,10 +28,4 @@ public partial class ExtentionButton_VM : ObservableObject
         FileType = fileType;
     }
 
-    [RelayCommand]
-    public void SelectFileType()
-    {
-        IsSelected = !IsSelected;
-        FileTypeSelected?.Invoke(this, EventArgs.Empty);
-    }
 }

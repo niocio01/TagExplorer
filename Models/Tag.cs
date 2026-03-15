@@ -1,8 +1,6 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
-using System.Windows;
 using TagExplorer.Data;
 
 namespace TagExplorer.Models;
@@ -67,13 +65,8 @@ public partial class Tag : ObservableValidator, ITag
     }
 }
 
-public partial class FilterTag : ObservableObject,  ITag
+public partial class FilterTag : Filter,  ITag
 {
-    public enum FilterTypes
-    {
-        MustHave,
-        MustNotHave
-    }
 
     public string? Name { get; set; }
     public Color? Color { get; set; }
@@ -83,21 +76,6 @@ public partial class FilterTag : ObservableObject,  ITag
     public List<Tag>? Children { get; set; }
     public List<string>? Aliases { get; set; }
     public bool IsSystemTag { get; set; }
-
-    [ObservableProperty] 
-    private FilterTypes? _filterType;
-
-    [RelayCommand]
-    public void ToggleMustHaveFilter()
-    {
-        FilterType = FilterType == FilterTypes.MustHave ? null : FilterTypes.MustHave;
-    }
-
-    [RelayCommand]
-    public void ToggleMustNotHaveFilter()
-    {
-        FilterType = FilterType == FilterTypes.MustNotHave ? null : FilterTypes.MustNotHave;
-    }
 
     public FilterTag(TagDTO tag)
     {
@@ -109,11 +87,9 @@ public partial class FilterTag : ObservableObject,  ITag
         Children = [];
         Aliases = tag.Aliases;
         IsSystemTag = tag.IsSystemTag;
-        FilterType = null;
     }
 
     public FilterTag()
     {
-        throw new NotImplementedException();
     }
 }

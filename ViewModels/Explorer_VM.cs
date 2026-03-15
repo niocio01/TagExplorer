@@ -41,11 +41,28 @@ public partial class Explorer_VM : ObservableObject
     [ObservableProperty]
     private ExplorerItem? _selectedItem;
 
-    [ObservableProperty] 
-    private ObservableCollection<FilterTag> _filterTags;
+    [ObservableProperty]
+    private ObservableCollection<FilterTag> _allFilterTags;
+    private List<FilterTag> _requiredTagFilters => AllFilterTags.Where(t => t.FilterType == FilterTypes.Required).ToList();
+    private List<FilterTag> _disallowedTagFilters => AllFilterTags.Where(t => t.FilterType == FilterTypes.Disallowed).ToList();
 
     [ObservableProperty]
-    private ObservableCollection<ExtentionButton_VM> _filterExtention_VMs;
+    private int _requiredTagFilterCount;
+
+    [ObservableProperty]
+    private int _disallowedTagFilterCount;
+
+    [ObservableProperty]
+    private ObservableCollection<ExtentionButton_VM> _AllFilterExtention_VMs;
+
+    private List<ExtentionButton_VM> _requiredExtentionFilters => AllFilterExtention_VMs.Where(e => e.FilterType == FilterTypes.Required).ToList();
+    private List<ExtentionButton_VM> _disallowedExtentionFilters => AllFilterExtention_VMs.Where(t => t.FilterType == FilterTypes.Disallowed).ToList();
+
+    [ObservableProperty]
+    private int _requiredExtentionFilterCount;
+
+    [ObservableProperty]
+    private int _disallowedExtentionFilterCount;
 
 
 
@@ -59,25 +76,40 @@ public partial class Explorer_VM : ObservableObject
 
         _breadcrumbsHistory = new ObservableCollection<List<Folder>>();
 
-        FilterTags = new ObservableCollection<FilterTag>();
+        AllFilterTags = new ObservableCollection<FilterTag>();
         List<TagDTO> dtoTags = _db.Tags
             .Include(tag => tag.Color)
             .ToList();
         foreach (TagDTO tagDTO in dtoTags)
         {
-            FilterTags.Add(new FilterTag(tagDTO));
+            var ft = new FilterTag(tagDTO);
+            AllFilterTags.Add(ft);
+            ft.FilterTypeChanged += TagFilterTypeChanged;
         }
 
-        FilterExtention_VMs = new ObservableCollection<ExtentionButton_VM>();
+        AllFilterExtention_VMs = new ObservableCollection<ExtentionButton_VM>();
         foreach (FileType fileType in FileTypes.Types)
         {
-            FilterExtention_VMs.Add(new ExtentionButton_VM(fileType));
+            var extentionButton_VM = new ExtentionButton_VM(fileType);
+            AllFilterExtention_VMs.Add(extentionButton_VM);
+            extentionButton_VM.FilterTypeChanged += ExtentionFilterTypeChanged;
         }
 
         SetCurrentPathToHome();
         AddToHistory(Breadcrumbs.ToList());
     }
-    
+
+    private void TagFilterTypeChanged(object? sender, FilterTypes e)
+    {
+        RequiredTagFilterCount = _requiredTagFilters.Count;
+        DisallowedTagFilterCount = _disallowedTagFilters.Count;
+    }
+
+    private void ExtentionFilterTypeChanged(object? sender, FilterTypes e)
+    {
+        RequiredExtentionFilterCount = _requiredExtentionFilters.Count;
+        DisallowedExtentionFilterCount = _disallowedExtentionFilters.Count;
+    }
 
     partial void OnSelectedItemChanged(ExplorerItem? value)
     {
@@ -236,18 +268,18 @@ public partial class Explorer_VM : ObservableObject
     [RelayCommand]
     public void ClearExtentionFilters()
     {
-        foreach (var extentionButton_VM in FilterExtention_VMs)
+        foreach (var extentionButton_VM in AllFilterExtention_VMs)
         {
-            extentionButton_VM.IsSelected = false;
+            extentionButton_VM.FilterType = FilterTypes.None;
         }
     }
 
     [RelayCommand]
     public void ClearTagsFilters()
     {
-        foreach (var filterTag in FilterTags)
+        foreach (var filterTag in AllFilterTags)
         {
-            filterTag.FilterType = null;
+            filterTag.FilterType = FilterTypes.None;
         }
     }
 }
