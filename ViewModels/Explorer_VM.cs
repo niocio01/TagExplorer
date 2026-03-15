@@ -8,10 +8,12 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using TagExplorer.Data;
 using TagExplorer.Models;
+using TagExplorer.Services;
 using File = TagExplorer.Models.File;
 using Folder = TagExplorer.Models.Folder;
 
@@ -23,6 +25,9 @@ public partial class Explorer_VM : ObservableObject
 
     [ObservableProperty]
     private ObservableCollection<ExplorerItem> _currentFolderItems;
+
+    [ObservableProperty]
+    private ObservableCollection<ExplorerItem> _filteredFolderItems;
 
     [ObservableProperty]
     private ObservableCollection<Folder> _breadcrumbs;
@@ -37,6 +42,15 @@ public partial class Explorer_VM : ObservableObject
     
     public bool GoBackAvailable => CurrentHistoryPosition >= 1;
     public bool GoForwardAvailable => CurrentHistoryPosition < BreadcrumbsHistory.Count-1;
+
+    [ObservableProperty]
+    private bool _doRecursiveSearch = true;
+
+    [ObservableProperty]
+    private bool _showFolders = true;
+
+    [ObservableProperty]
+    private bool _showHiddenFiles = false;
 
     [ObservableProperty]
     private ExplorerItem? _selectedItem;
@@ -64,22 +78,45 @@ public partial class Explorer_VM : ObservableObject
     [ObservableProperty]
     private int _disallowedExtentionFilterCount;
 
+    [ObservableProperty]
+    private bool _isSearching;
 
+    [ObservableProperty]
+    private int _scannedFolderCount;
 
-    private AppDbContext _db;
+    [ObservableProperty]
+    private int _scannedFileCount;
+
+    [ObservableProperty]
+    private int _scannedDepth;
+
+    [ObservableProperty]
+    private int _filteredFolderCount;
+
+    [ObservableProperty]
+    private int _filteredFileCount;
+
+    [ObservableProperty]
+    private double _estimatedSearchProgress;
+
+    private AppDbContext? _db;
+    private readonly ItemSearchService _itemSearchService = new();
+    private CancellationTokenSource? _itemSearchCts;
+    private readonly HashSet<string> _requiredExtensionsCache = new(StringComparer.OrdinalIgnoreCase);
 
     public Explorer_VM()
     {
-        _db = App.AppHost.Services.GetService<AppDbContext>();
+        _db = App.AppHost?.Services.GetService<AppDbContext>();
 
         CurrentFolderItems = new ObservableCollection<ExplorerItem>();
-
+        FilteredFolderItems = new ObservableCollection<ExplorerItem>();
+        FilteredFolderItems.CollectionChanged += (_, _) => RefreshFilteredCounts();
         _breadcrumbsHistory = new ObservableCollection<List<Folder>>();
 
         AllFilterTags = new ObservableCollection<FilterTag>();
-        List<TagDTO> dtoTags = _db.Tags
+        List<TagDTO> dtoTags = _db?.Tags
             .Include(tag => tag.Color)
-            .ToList();
+            .ToList() ?? [];
         foreach (TagDTO tagDTO in dtoTags)
         {
             var ft = new FilterTag(tagDTO);
@@ -95,6 +132,7 @@ public partial class Explorer_VM : ObservableObject
             extentionButton_VM.FilterTypeChanged += ExtentionFilterTypeChanged;
         }
 
+        RefreshRequiredExtensionsCache();
         SetCurrentPathToHome();
         AddToHistory(Breadcrumbs.ToList());
     }
@@ -109,6 +147,24 @@ public partial class Explorer_VM : ObservableObject
     {
         RequiredExtentionFilterCount = _requiredExtentionFilters.Count;
         DisallowedExtentionFilterCount = _disallowedExtentionFilters.Count;
+
+        RefreshRequiredExtensionsCache();
+        RebuildFilteredItems();
+    }
+
+    partial void OnDoRecursiveSearchChanged(bool value)
+    {
+        ReloadCurrentFolder();
+    }
+
+    partial void OnShowFoldersChanged(bool value)
+    {
+        RebuildFilteredItems();
+    }
+
+    partial void OnShowHiddenFilesChanged(bool value)
+    {
+        ReloadCurrentFolder();
     }
 
     partial void OnSelectedItemChanged(ExplorerItem? value)
@@ -155,13 +211,28 @@ public partial class Explorer_VM : ObservableObject
         ];
 
         CurrentFolderItems.Clear();
+        FilteredFolderItems.Clear();
+
+        if (_db == null)
+        {
+            return;
+        }
+
         foreach (FolderBase folderBase in _db.Folders)
         {
-            CurrentFolderItems.Add(new Folder(folderBase.Path, folderBase.Name));
+            var folder = new Folder(folderBase.Path, folderBase.Name);
+            CurrentFolderItems.Add(folder);
         }
+
+        RebuildFilteredItems();
     }
 
     private void SetCurrentFolderItems(Folder newCurrentFolder)
+    {
+        _ = SetCurrentFolderItemsAsync(newCurrentFolder);
+    }
+
+    private async Task SetCurrentFolderItemsAsync(Folder newCurrentFolder)
     {
         if (newCurrentFolder.Name == "BaseFolders")
         {
@@ -169,16 +240,106 @@ public partial class Explorer_VM : ObservableObject
             return;
         }
 
+        _itemSearchCts?.Cancel();
+        _itemSearchCts = new CancellationTokenSource();
+        var cancellationToken = _itemSearchCts.Token;
+
+        BeginSearchProgress();
+
         CurrentFolderItems.Clear();
-        var directories = Directory.GetDirectories(newCurrentFolder.Path);
-        foreach (var directory in directories) {
-            CurrentFolderItems.Add(new Folder(Path.GetFileName(directory), newCurrentFolder));
+        FilteredFolderItems.Clear();
+
+        if (_itemSearchService.TryGetCachedAllItems(newCurrentFolder.Path, DoRecursiveSearch, ShowHiddenFiles, out var cachedItems))
+        {
+            foreach (var item in cachedItems)
+            {
+                CurrentFolderItems.Add(item);
+                if (MatchesActiveFilters(item))
+                {
+                    FilteredFolderItems.Add(item);
+                }
+            }
+
+            ScannedFolderCount = cachedItems.Count(item => item is Folder);
+            ScannedFileCount = cachedItems.Count(item => item is File);
+            ScannedDepth = CalculateCachedDepth(newCurrentFolder.Path, cachedItems);
+            EstimatedSearchProgress = 100;
+            IsSearching = false;
+
+            return;
         }
 
-        var files = Directory.GetFiles(newCurrentFolder.Path);
-        foreach (var file in files) {
-            CurrentFolderItems.Add(new File(Path.GetFileName(file), Path.GetExtension(file)));
+        try
+        {
+            await _itemSearchService.SearchAsync(
+                newCurrentFolder,
+                includeSubdirectories: DoRecursiveSearch,
+                includeHiddenFiles: ShowHiddenFiles,
+                onItem: item =>
+                {
+                    App.Current.Dispatcher.Invoke(() =>
+                    {
+                        CurrentFolderItems.Add(item);
+                        if (MatchesActiveFilters(item))
+                        {
+                            FilteredFolderItems.Add(item);
+                        }
+                    });
+                },
+                onProgress: (folders, files, depth, progress) =>
+                {
+                    App.Current.Dispatcher.Invoke(() =>
+                    {
+                        ScannedFolderCount = folders;
+                        ScannedFileCount = files;
+                        ScannedDepth = depth;
+                        EstimatedSearchProgress = progress;
+                    });
+                },
+                cancellationToken);
+
+            EstimatedSearchProgress = 100;
+            IsSearching = false;
         }
+        catch (OperationCanceledException)
+        {
+            IsSearching = false;
+        }
+    }
+
+    private void BeginSearchProgress()
+    {
+        IsSearching = true;
+        ScannedFolderCount = 0;
+        ScannedFileCount = 0;
+        ScannedDepth = 0;
+        EstimatedSearchProgress = 0;
+    }
+
+    private static int CalculateCachedDepth(string rootPath, IReadOnlyList<ExplorerItem> items)
+    {
+        var maxDepth = 0;
+
+        foreach (var folder in items.OfType<Folder>())
+        {
+            maxDepth = Math.Max(maxDepth, GetDepth(rootPath, folder.Path));
+        }
+
+        return maxDepth;
+    }
+
+    private static int GetDepth(string rootPath, string currentPath)
+    {
+        if (currentPath.Length <= rootPath.Length)
+            return 0;
+
+        var relative = currentPath[rootPath.Length..]
+            .TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
+        if (string.IsNullOrWhiteSpace(relative))
+            return 0;
+
+        return relative.Split([Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar], StringSplitOptions.RemoveEmptyEntries).Length;
     }
 
     // add the provided breadcrumbs to the history
@@ -281,5 +442,97 @@ public partial class Explorer_VM : ObservableObject
         {
             filterTag.FilterType = FilterTypes.None;
         }
+    }
+
+    private static bool IsHiddenItem(ExplorerItem item)
+    {
+        try
+        {
+            if (item is Folder folder)
+            {
+                var attributes = System.IO.File.GetAttributes(folder.Path);
+                return (attributes & FileAttributes.Hidden) == FileAttributes.Hidden;
+            }
+
+            if (item is File file && !string.IsNullOrWhiteSpace(file.FullPath))
+            {
+                var attributes = System.IO.File.GetAttributes(file.FullPath);
+                return (attributes & FileAttributes.Hidden) == FileAttributes.Hidden;
+            }
+        }
+        catch
+        {
+        }
+
+        return false;
+    }
+
+    private static bool MatchesExtensionFilter(ExplorerItem item, HashSet<string> requiredExtensions)
+    {
+        if (requiredExtensions.Count == 0)
+            return true;
+
+        if (item is not File fileItem)
+            return false;
+
+        return requiredExtensions.Contains(fileItem.Extension);
+    }
+
+    private bool MatchesActiveFilters(ExplorerItem item)
+    {
+        if (!ShowFolders && item is Folder)
+            return false;
+
+        if (!ShowHiddenFiles && IsHiddenItem(item))
+            return false;
+
+        return MatchesExtensionFilter(item, _requiredExtensionsCache);
+    }
+
+    private void RebuildFilteredItems()
+    {
+        FilteredFolderItems.Clear();
+        foreach (var item in CurrentFolderItems)
+        {
+            if (MatchesActiveFilters(item))
+            {
+                FilteredFolderItems.Add(item);
+            }
+        }
+
+        RefreshFilteredCounts();
+    }
+
+    private void RefreshFilteredCounts()
+    {
+        FilteredFolderCount = FilteredFolderItems.Count(item => item is Folder);
+        FilteredFileCount = FilteredFolderItems.Count(item => item is File);
+    }
+
+    private void RefreshRequiredExtensionsCache()
+    {
+        _requiredExtensionsCache.Clear();
+        foreach (var filter in _requiredExtentionFilters)
+        {
+            // FileType extensions are already normalized in FileTypes.Types
+            _requiredExtensionsCache.Add(filter.FileType.Extension);
+        }
+    }
+
+    private void ReloadCurrentFolder()
+    {
+        if (Breadcrumbs.Count == 0)
+        {
+            return;
+        }
+
+        var currentFolder = Breadcrumbs.Last();
+        if (currentFolder.Name == "BaseFolders")
+        {
+            SetCurrentPathToHome();
+            return;
+        }
+
+        SetCurrentFolderItems(currentFolder);
     }
 }

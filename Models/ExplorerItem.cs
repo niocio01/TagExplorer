@@ -92,7 +92,6 @@ public abstract class ExplorerItem
     public string Path { get; }
     // If null, this item is a root folder
     public Folder? ParentFolder { get; init; }
-    public List<ExplorerItem> Children { get; init; } = new List<ExplorerItem>();
 }
 
 public class Folder : ExplorerItem
@@ -101,6 +100,8 @@ public class Folder : ExplorerItem
     private string? _path;
 
     public bool HasParentFolder => ParentFolder != null;
+
+    public List<ExplorerItem> Children { get; init; } = new List<ExplorerItem>();
 
     // root folder
     public Folder(string rootPath, string name)
@@ -139,19 +140,23 @@ public class Folder : ExplorerItem
 
 public class File : ExplorerItem
 {
-    public File(string name, string fileExtension)
+    public string Extension { get; }
+    public string? FullPath { get; }
+
+    public File(string name, string fileExtension, string? fullPath = null)
     {
         Name = name;
+        Extension = fileExtension.TrimStart('.').ToLowerInvariant();
+        FullPath = fullPath;
+
         try
         {
-            fileExtension = fileExtension[1..].ToLower();
-            var type = FileTypes.Types.First(t => t.Extension == fileExtension);
+            var type = FileTypes.Types.First(t => t.Extension == Extension);
             IconString = type.IconString ?? "help";
         }
-        catch (Exception e)
+        catch
         {
             IconString = "help";
         }
-        
     }
 }

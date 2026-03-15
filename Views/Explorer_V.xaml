@@ -27,13 +27,28 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <StackPanel 
+        <Grid x:Name="TopBar" 
             Grid.Row="0"
-            Margin="5 0 0 0"
-            Orientation="Horizontal">
+            Margin="5 0 0 0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
             <Button
+                Grid.Column="0"
                 Background="Transparent"
                 BorderBrush="Transparent"
                 BorderThickness="0"
@@ -50,6 +65,7 @@
                     VerticalAlignment="Center" />
             </Button>
             <Button
+                Grid.Column="1"
                 Background="Transparent"
                 BorderBrush="Transparent"
                 BorderThickness="0"
@@ -66,11 +82,13 @@
                     VerticalAlignment="Center" />
             </Button>
             <Rectangle
+                Grid.Column="3"
                 Fill="{DynamicResource MaterialDesignLightSeparatorBackground}"
                 Width="2"
                 Grid.Row="1"
                 Margin="10 0 5 0"/>
             <Button
+                Grid.Column="4"
             Background="Transparent"
             BorderBrush="Transparent"
             BorderThickness="0"
@@ -87,8 +105,8 @@
                 VerticalAlignment="Center" />
             </Button>
             <ItemsControl
+                Grid.Column="5"
                 Padding="5 4 5 4"
-                Grid.Row="0"
                 x:Name="Breadcrumb"
                 ItemsSource="{Binding Breadcrumbs}"
                 d:ItemsSource="{d:SampleData ItemCount=5}">
@@ -131,13 +149,52 @@
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
-        </StackPanel>
+            <Rectangle
+                Grid.Column="6"
+                Fill="{DynamicResource MaterialDesignLightSeparatorBackground}"
+                Width="2"
+                Grid.Row="1"
+                Margin="10 0 5 0"/>
+            <ToggleButton
+                Grid.Column="7"
+                Margin="0 0 0 0"
+                Height="30"
+                Width="30"
+                Content="{materialDesign:PackIcon Kind=FileTreeOutline,                                                         Size=21}"
+                IsChecked="{Binding Path=DoRecursiveSearch}"
+                d:IsChecked="True"
+                Style="{StaticResource MaterialDesignFlatPrimaryToggleButton}"
+                ToolTip="Search inside subfolders"
+              />
+
+            <ToggleButton
+                Grid.Column="8"
+                Margin="5 0 0 0"
+                Height="30"
+                Width="30"
+                Content="{materialDesign:PackIcon Kind=FolderOutline,                                                         Size=21}"
+                IsChecked="{Binding Path=ShowFolders}"
+                d:IsChecked="True"
+                Style="{StaticResource MaterialDesignFlatPrimaryToggleButton}"
+                ToolTip="Show folders in results"
+            />
+
+            <ToggleButton
+                Grid.Column="9"
+                Margin="5 0 5 0"
+                Height="30"
+                Width="30"
+                Content="{materialDesign:PackIcon Kind=FileHidden,                                                         Size=21}"
+                IsChecked="{Binding Path=ShowHiddenFiles}"
+                Style="{StaticResource MaterialDesignFlatPrimaryToggleButton}"
+                ToolTip="Show hidden files" />
+        </Grid>
         <Rectangle
             Fill="{DynamicResource MaterialDesignLightSeparatorBackground}"
             Height="2"
             Grid.Row="1"
             Margin="0"/>
-        <Grid
+        <Grid x:Name="Conent"
             Grid.Row="2">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="258" />
@@ -288,11 +345,11 @@
             <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Center" />
 
             <ListBox Name="FileExplorer"
-                Grid.Column="2"
-                ScrollViewer.VerticalScrollBarVisibility="Auto"
-                SelectedItem="{Binding SelectedItem}"
-                ItemsSource="{Binding Path=CurrentFolderItems}" 
-                d:ItemsSource="{d:SampleData ItemCount=5}">
+    Grid.Column="2"
+    ScrollViewer.VerticalScrollBarVisibility="Auto"
+    SelectedItem="{Binding SelectedItem}"
+    ItemsSource="{Binding Path=FilteredFolderItems}" 
+    d:ItemsSource="{d:SampleData ItemCount=5}">
                 <ListBox.ItemContainerStyle>
                     <Style TargetType="{x:Type ListBoxItem}" BasedOn="{StaticResource {x:Type ListBoxItem}}">
                         <EventSetter Event="MouseDoubleClick" Handler="ListBoxItem_MouseDoubleClick"/>
@@ -363,6 +420,80 @@
 
 
             </Grid>
+        </Grid>
+        <Rectangle
+            Fill="{DynamicResource MaterialDesignLightSeparatorBackground}"
+            Height="2"
+            Grid.Row="4"
+            Margin="0"/>
+        <Grid x:Name="BottomBar"
+            Grid.Row="5">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel
+                Grid.Column="0"
+                Margin="10 4 0 4"
+                Orientation="Horizontal"
+                VerticalAlignment="Center">
+                <materialDesign:PackIcon
+                    Kind="FolderOutline"
+                    Width="16"
+                    Height="16"
+                    VerticalAlignment="Center" />
+                <TextBlock
+                    Margin="4 0 10 0"
+                    VerticalAlignment="Center"
+                    Text="{Binding FilteredFolderCount, StringFormat={}{0:N0}}" />
+                <materialDesign:PackIcon
+                    Kind="FileOutline"
+                    Width="16"
+                    Height="16"
+                    VerticalAlignment="Center" />
+                <TextBlock
+                    Margin="4 0 0 0"
+                    VerticalAlignment="Center"
+                    Text="{Binding FilteredFileCount, StringFormat={}{0:N0}}" />
+            </StackPanel>
+
+            <StackPanel
+                Grid.Column="2"
+                Margin="0 4 10 4"
+                Orientation="Horizontal"
+                VerticalAlignment="Center">
+                <materialDesign:PackIcon
+                    Kind="FolderOutline"
+                    Width="16"
+                    Height="16"
+                    VerticalAlignment="Center" />
+                <TextBlock
+                    Margin="4 0 10 0"
+                    VerticalAlignment="Center"
+                    Text="{Binding ScannedFolderCount, StringFormat={}{0:N0}}" />
+                <materialDesign:PackIcon
+                    Kind="FileOutline"
+                    Width="16"
+                    Height="16"
+                    VerticalAlignment="Center" />
+                <TextBlock
+                    Margin="4 0 0 0"
+                    VerticalAlignment="Center"
+                    Text="{Binding ScannedFileCount, StringFormat={}{0:N0}}" />
+
+                <materialDesign:PackIcon
+                    Kind="FileTreeOutline"
+                    Width="16"
+                    Height="16"
+                    Margin="12 0 0 0"
+                    VerticalAlignment="Center" />
+                <TextBlock
+                    Margin="4 0 0 0"
+                    VerticalAlignment="Center"
+                    Text="{Binding ScannedDepth}" />
+            </StackPanel>
         </Grid>
     </Grid>
 </UserControl>
