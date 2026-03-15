@@ -45,7 +45,7 @@ public partial class Explorer_VM : ObservableObject
     private ObservableCollection<FilterTag> _filterTags;
 
     [ObservableProperty]
-    private ObservableCollection<FileType> _filterFileTypes;
+    private ObservableCollection<ExtentionButton_VM> _filterExtention_VMs;
 
 
 
@@ -68,10 +68,10 @@ public partial class Explorer_VM : ObservableObject
             FilterTags.Add(new FilterTag(tagDTO));
         }
 
-        FilterFileTypes = new ObservableCollection<FileType>();
+        FilterExtention_VMs = new ObservableCollection<ExtentionButton_VM>();
         foreach (FileType fileType in FileTypes.Types)
         {
-            FilterFileTypes.Add(fileType);
+            FilterExtention_VMs.Add(new ExtentionButton_VM(fileType));
         }
 
         SetCurrentPathToHome();
@@ -231,5 +231,23 @@ public partial class Explorer_VM : ObservableObject
         Breadcrumbs = new ObservableCollection<Folder>(BreadcrumbsHistory[CurrentHistoryPosition]);
 
         SetCurrentFolderItems(Breadcrumbs.Last());
+    }
+
+    [RelayCommand]
+    public void ClearExtentionFilters()
+    {
+        foreach (var extentionButton_VM in FilterExtention_VMs)
+        {
+            extentionButton_VM.IsSelected = false;
+        }
+    }
+
+    [RelayCommand]
+    public void ClearTagsFilters()
+    {
+        foreach (var filterTag in FilterTags)
+        {
+            filterTag.FilterType = null;
+        }
     }
 }
