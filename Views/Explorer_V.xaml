@@ -201,35 +201,15 @@
                     Style="{StaticResource MaterialDesignBody1TextBlock}"
                     Text="FileType"/>
                 <ScrollViewer 
-                    Grid.Row="6" VerticalScrollBarVisibility="Auto">
+                    Grid.Row="6"
+                    VerticalScrollBarVisibility="Auto"
+                    d:VerticalScrollBarVisibility="Visible">
                     <ItemsControl
-                        ItemsSource="{Binding Path=FilterFileTypes}"
+                        ItemsSource="{Binding Path=FilterExtention_VMs}"
                         d:ItemsSource="{d:SampleData ItemCount=10}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Button
-                                    Height="55"
-                                    Width="50"
-                                    Margin="5"
-                                    Padding="0 5 0 0"
-                                    Style="{StaticResource MaterialDesignFlatLightButton}"
-                                    ToolTip="{Binding Path=DisplayString}"
-                                    Foreground="{StaticResource MaterialDesign.Brush.Foreground}">
-                                    <StackPanel
-                                        Orientation="Vertical">
-                                        <materialDesign:PackIcon
-                                            Kind="{Binding Path=IconString}"
-                                            Width="25" Height="25"
-                                            Padding="0"
-                                            Margin="0 0 0 -2"
-                                            HorizontalAlignment="Center" />
-                                        <TextBlock 
-                                            Style="{StaticResource MaterialDesignBody1TextBlock}"
-                                            Text="{Binding Path=Extension}"
-                                            HorizontalAlignment="Center"
-                                            d:Text="ext"/>
-                                    </StackPanel>
-                                </Button>
+                                <local:ExtentionButton_V DataContext="{Binding}" />
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                         <ItemsControl.ItemsPanel>

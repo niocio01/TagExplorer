@@ -1,0 +1,47 @@
+﻿<UserControl x:Class="TagExplorer.Views.ExtentionButton_V"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:TagExplorer.Views"
+             xmlns:viewModels="clr-namespace:TagExplorer.ViewModels"
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+             mc:Ignorable="d" 
+             d:DesignHeight="60" d:DesignWidth="60"
+             d:DataContext="{d:DesignInstance Type=viewModels:ExtentionButton_VM, IsDesignTimeCreatable=True}" Loaded="UserControl_Loaded">
+    <Grid>
+        <Button
+            BorderThickness="0"
+            Height="55" Width="50"
+            Command="{Binding Path=SelectFileTypeCommand}"
+            ToolTip="{Binding Path=FileType.DisplayString}"
+            Padding="0"
+            Margin="2" >
+            <Button.Style>
+                <Style TargetType="{x:Type Button}"
+                       BasedOn="{StaticResource MaterialDesignFlatLightButton}">
+                    <Setter Property="Foreground" Value="{DynamicResource MaterialDesign.Brush.Foreground}" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding Path=IsSelected}" Value="true">
+                            <Setter Property="Background" Value="{DynamicResource MaterialDesign.Brush.Chip.OutlineBorder}" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Button.Style>
+            <StackPanel
+                Orientation="Vertical">
+                <materialDesign:PackIcon
+                    Kind="{Binding Path=FileType.IconString}"
+                    Width="25" Height="25"
+                    Padding="0"
+                    Margin="0 0 0 -2"
+                    HorizontalAlignment="Center" />
+                <TextBlock
+                    Style="{StaticResource MaterialDesignBody1TextBlock}"
+                    Text="{Binding Path=FileType.Extension}"
+                    HorizontalAlignment="Center"
+                    d:Text="extent"/>
+            </StackPanel>
+        </Button>
+    </Grid>
+</UserControl>
