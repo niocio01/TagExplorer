@@ -61,6 +61,7 @@ public partial class FileList_VM : ObservableObject
     public string? CurrentFolderPath => _currentFolder?.Path;
 
     public event EventHandler<Folder>? FolderDoubleClicked;
+    public event EventHandler<ExplorerItem?>? SelectedItemChanged;
 
     private FileListFilterOptions FileListFilterOptions => new(
         _showFolders,
@@ -139,6 +140,11 @@ public partial class FileList_VM : ObservableObject
 
         SelectedItem = null;
         FolderDoubleClicked?.Invoke(this, folder);
+    }
+
+    partial void OnSelectedItemChanged(ExplorerItem? value)
+    {
+        SelectedItemChanged?.Invoke(this, value);
     }
 
     private async Task SetCurrentFolderItemsAsync(Folder newCurrentFolder)

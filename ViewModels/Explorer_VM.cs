@@ -24,6 +24,9 @@ public partial class Explorer_VM : ObservableObject
     private FileList_VM _fileList;
 
     [ObservableProperty]
+    private ItemDetails_VM _itemDetails;
+
+    [ObservableProperty]
     private ObservableCollection<Folder> _breadcrumbs;
 
     [ObservableProperty]
@@ -77,6 +80,8 @@ public partial class Explorer_VM : ObservableObject
 
         FileList = new FileList_VM();
         FileList.FolderDoubleClicked += FileListFolderDoubleClicked;
+        FileList.SelectedItemChanged += FileListSelectedItemChanged;
+        ItemDetails = new ItemDetails_VM();
         _breadcrumbsHistory = new ObservableCollection<List<Folder>>();
 
         AllFilterTags = new ObservableCollection<FilterTag>();
@@ -101,6 +106,11 @@ public partial class Explorer_VM : ObservableObject
         ApplyFileListFilters(reloadCurrentFolder: false);
         SetCurrentPathToHome();
         AddToHistory(Breadcrumbs.ToList());
+    }
+
+    private void FileListSelectedItemChanged(object? sender, ExplorerItem? selectedItem)
+    {
+        ItemDetails.SelectedItem = selectedItem;
     }
 
     private void TagFilterTypeChanged(object? sender, FilterTypes e)

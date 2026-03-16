@@ -1,0 +1,108 @@
+<UserControl x:Class="TagExplorer.Views.ItemDetails_V"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+             TextElement.Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
+             mc:Ignorable="d"
+             d:DesignHeight="450"
+             d:DesignWidth="400">
+    <UserControl.Resources>
+        <Style 
+            TargetType="TextBlock"
+            BasedOn="{StaticResource MaterialDesignBody2TextBlock}"
+            x:Key="Label">
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin" Value="0 0 8 0" />
+        </Style>
+        <Style 
+            TargetType="TextBlock"
+            BasedOn="{StaticResource MaterialDesignBody2TextBlock}"
+            x:Key="Value">
+        </Style>
+        <Style
+            TargetType="materialDesign:PackIcon">
+            <Setter Property="Width" Value="16" />
+            <Setter Property="Height" Value="16" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+
+        </Style>
+    </UserControl.Resources>
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="12" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Orientation="Horizontal" VerticalAlignment="Top">
+            <materialDesign:PackIcon
+                Kind="{Binding SelectedItemIconString}"
+                Width="26"
+                Height="26"
+                Margin="0 0 8 0"
+                ToolTip="Selected item icon"
+                VerticalAlignment="Center" />
+            <TextBlock
+                Style="{StaticResource MaterialDesignHeadline5TextBlock}"
+                Text="{Binding SelectedItemName}"
+                d:Text="ExampleReport_Final_v3.pdf"
+                VerticalAlignment="Center" />
+        </StackPanel>
+
+        <Grid Grid.Row="2" Margin="0 4 0 0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="24" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <materialDesign:PackIcon Grid.Row="0" Grid.Column="0" Kind="FileTreeOutline" ToolTip="Path" />
+            <TextBlock Grid.Row="0" Grid.Column="1" Text="Path:" Style="{StaticResource Label}" />
+            <TextBox Grid.Row="0" Grid.Column="2"
+                     Text="{Binding ItemPath, Mode=OneWay}"
+                     d:Text="C:\Projects\TagExplorer\Docs\ExampleReport_Final_v3.pdf"
+                     Style="{StaticResource MaterialDesignTextBox}"
+                     IsReadOnly="True" 
+                     BorderThickness="0"
+                     materialDesign:TextFieldAssist.UnderlineBrush="Transparent"
+                     Padding="0"
+                     VerticalContentAlignment="Center" />
+            <Button Grid.Row="0"
+                    Grid.Column="3"
+                    Height="18"
+                    Margin="8 0 8 0"
+                    Padding="0"
+                    Command="{Binding CopyPathCommand}"
+                    Style="{StaticResource MaterialDesignFlatButton}"
+                    ToolTip="Copy full path to clipboard">
+                <materialDesign:PackIcon Kind="ContentCopy" ToolTip="Copy full path" />
+            </Button>
+
+            <materialDesign:PackIcon Grid.Row="1" Grid.Column="0" Kind="FileOutline" ToolTip="Type" />
+            <TextBlock Grid.Row="1" Grid.Column="1" Text="Type:" Style="{StaticResource Label}" />
+            <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding ItemType}" d:Text="PDF Document" Style="{StaticResource Value}" />
+
+            <materialDesign:PackIcon Grid.Row="2" Grid.Column="0" Kind="ContentSaveOutline" ToolTip="Size" />
+            <TextBlock Grid.Row="2" Grid.Column="1" Text="Size:" Style="{StaticResource Label}" />
+            <TextBlock Grid.Row="2" Grid.Column="2" Text="{Binding ItemSize}" d:Text="2.48 MB" Style="{StaticResource Value}" />
+
+            <materialDesign:PackIcon Grid.Row="3" Grid.Column="0" Kind="ClockPlusOutline" ToolTip="Creation date" />
+            <TextBlock Grid.Row="3" Grid.Column="1" Text="Created:" Style="{StaticResource Label}" />
+            <TextBlock Grid.Row="3" Grid.Column="2" Text="{Binding ItemCreated}" d:Text="04/05/2026 14:22" Style="{StaticResource Value}" />
+
+            <materialDesign:PackIcon Grid.Row="4" Grid.Column="0" Kind="ClockEditOutline" ToolTip="Last modified date" />
+            <TextBlock Grid.Row="4" Grid.Column="1" Text="Modified:" Style="{StaticResource Label}" />
+            <TextBlock Grid.Row="4" Grid.Column="2" Text="{Binding ItemLastModified}" d:Text="06/11/2026 09:18" Style="{StaticResource Value}" />
+        </Grid>
+    </Grid>
+</UserControl>
