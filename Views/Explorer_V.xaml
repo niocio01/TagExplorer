@@ -401,7 +401,7 @@
                           materialDesign:ExpanderAssist.HorizontalHeaderPadding="10,10,10,5"
                           Header="Child Tags">
                     <ItemsControl 
-                        ItemsSource="{Binding Path=ItemTags}"
+                        ItemsSource="{Binding Path=SelectedItemTags}"
                         d:ItemsSource="{d:SampleData ItemCount=3}"
                         Margin="10 10 10 10">
                         <ItemsControl.ItemTemplate>

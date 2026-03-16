@@ -2,6 +2,7 @@
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
 using CommunityToolkit.Mvvm.Messaging.Messages;
+using MaterialDesignThemes.Wpf;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -19,7 +20,12 @@ public partial class ExtentionButton_VM : Filter
     public event EventHandler FileTypeSelected;
 
     [ObservableProperty] private FileType _fileType;
-    
+
+    public PackIconKind IconKind =>
+    Enum.TryParse<PackIconKind>(FileType.IconString, true, out var kind)
+        ? kind
+        : PackIconKind.FileOutline;
+
 
     public ExtentionButton_VM() { }
 

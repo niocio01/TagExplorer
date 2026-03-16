@@ -32,7 +32,7 @@ public static class FileTypes
         new("docx", "FileWordBox", "Word Document", ["docx", "word", "document"]),
         new("xlsx", "FileExcelBox", "Excel Spreadsheet", ["xlsx", "excel", "spreadsheet", "table", "tabular"]),
         new("pptx", "FilePowerpointBox", "PowerPoint Presentation", ["pptx", "powerpoint", "presentation"]),
-        new("csv", "FileCsvBox", "CSV File", ["csv", "spreadsheet"]),
+        new("csv", "FileExcelBox", "CSV File", ["csv", "spreadsheet"]),
         new("pdf", "FilePdfBox", "PDF Document", ["pdf", "document"]),
         new("jpg", "FileJpgBox", "JPEG Image", ["jpg", "jpeg", "image", "photo"]),
         new("png", "FilePngBox", "PNG Image", ["png", "image", "photo"]),
@@ -82,6 +82,9 @@ public static class FileTypes
         new("m4a", "MusicBox", "M4A Audio", ["m4a", "audio", "music"]),
 
     ];
+
+    public static readonly IReadOnlyDictionary<string, FileType> ByExtension =
+        Types.ToDictionary(t => t.Extension, StringComparer.OrdinalIgnoreCase);
 }
 
 public abstract class ExplorerItem
@@ -149,14 +152,8 @@ public class File : ExplorerItem
         Extension = fileExtension.TrimStart('.').ToLowerInvariant();
         FullPath = fullPath;
 
-        try
-        {
-            var type = FileTypes.Types.First(t => t.Extension == Extension);
-            IconString = type.IconString ?? "help";
-        }
-        catch
-        {
-            IconString = "help";
-        }
+        IconString = FileTypes.ByExtension.TryGetValue(Extension, out var type)
+            ? type.IconString
+            : "help";
     }
 }

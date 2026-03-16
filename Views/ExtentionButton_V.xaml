@@ -38,7 +38,7 @@
             <StackPanel
                 Orientation="Vertical">
                 <materialDesign:PackIcon
-                    Kind="{Binding Path=FileType.IconString}"
+                    Kind="{Binding IconKind}"
                     Width="25" Height="25"
                     Padding="0"
                     Margin="0 0 0 -2"
