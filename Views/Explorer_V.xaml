@@ -344,35 +344,9 @@
 
             <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Center" />
 
-            <ListBox Name="FileExplorer"
-    Grid.Column="2"
-    ScrollViewer.VerticalScrollBarVisibility="Auto"
-    SelectedItem="{Binding SelectedItem}"
-    ItemsSource="{Binding Path=FilteredFolderItems}" 
-    d:ItemsSource="{d:SampleData ItemCount=5}">
-                <ListBox.ItemContainerStyle>
-                    <Style TargetType="{x:Type ListBoxItem}" BasedOn="{StaticResource {x:Type ListBoxItem}}">
-                        <EventSetter Event="MouseDoubleClick" Handler="ListBoxItem_MouseDoubleClick"/>
-                    </Style>
-                </ListBox.ItemContainerStyle>
-                <ListBox.ItemTemplate>
-                    <DataTemplate>
-                        <StackPanel
-                            Orientation="Horizontal">
-                            <materialDesign:PackIcon
-                                Height="20" Width="20"
-                                Kind="{Binding Path=IconString}"
-                                Padding="0"
-                                Margin="0 -3 10 0" />
-                            <TextBlock
-                                Text="{Binding Path=Name}"
-                                d:Text="Item text that is fairly long.txt"
-                                Style="{StaticResource MaterialDesignBody2TextBlock}" >
-                            </TextBlock>
-                        </StackPanel>
-                    </DataTemplate>
-                </ListBox.ItemTemplate>
-            </ListBox>
+            <local:FileList_V
+                Grid.Column="2"
+                DataContext="{Binding FileList}" />
 
             <GridSplitter Grid.Column="3" Width="5" HorizontalAlignment="Center" />
 
@@ -391,7 +365,7 @@
                 <TextBlock
                     Grid.Row="0"
                     Style="{StaticResource MaterialDesignHeadline5TextBlock}"
-                    Text="{Binding Path=SelectedItem.Name, FallbackValue='No Item Selected' }"
+                    Text="{Binding Path=FileList.SelectedItem.Name, FallbackValue='No Item Selected' }"
                     d:Text="Explorer Item"
                     VerticalAlignment="Center"
                     HorizontalAlignment="Center"/>
@@ -447,7 +421,7 @@
                 <TextBlock
                     Margin="4 0 10 0"
                     VerticalAlignment="Center"
-                    Text="{Binding FilteredFolderCount, StringFormat={}{0:N0}}" />
+                    Text="{Binding FileList.FilteredFolderCount, StringFormat={}{0:N0}}" />
                 <materialDesign:PackIcon
                     Kind="FileOutline"
                     Width="16"
@@ -456,7 +430,7 @@
                 <TextBlock
                     Margin="4 0 0 0"
                     VerticalAlignment="Center"
-                    Text="{Binding FilteredFileCount, StringFormat={}{0:N0}}" />
+                    Text="{Binding FileList.FilteredFileCount, StringFormat={}{0:N0}}" />
             </StackPanel>
 
             <StackPanel
@@ -472,7 +446,7 @@
                 <TextBlock
                     Margin="4 0 10 0"
                     VerticalAlignment="Center"
-                    Text="{Binding ScannedFolderCount, StringFormat={}{0:N0}}" />
+                    Text="{Binding FileList.ScannedFolderCount, StringFormat={}{0:N0}}" />
                 <materialDesign:PackIcon
                     Kind="FileOutline"
                     Width="16"
@@ -481,7 +455,7 @@
                 <TextBlock
                     Margin="4 0 0 0"
                     VerticalAlignment="Center"
-                    Text="{Binding ScannedFileCount, StringFormat={}{0:N0}}" />
+                    Text="{Binding FileList.ScannedFileCount, StringFormat={}{0:N0}}" />
 
                 <materialDesign:PackIcon
                     Kind="FileTreeOutline"
@@ -492,7 +466,7 @@
                 <TextBlock
                     Margin="4 0 0 0"
                     VerticalAlignment="Center"
-                    Text="{Binding ScannedDepth}" />
+                    Text="{Binding FileList.ScannedDepth}" />
             </StackPanel>
         </Grid>
     </Grid>
