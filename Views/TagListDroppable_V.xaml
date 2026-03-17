@@ -1,0 +1,116 @@
+<UserControl x:Class="TagExplorer.Views.TagListDroppable_V"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:local="clr-namespace:TagExplorer.Views"
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+             x:Name="Root"
+             mc:Ignorable="d"
+             d:DesignHeight="150"
+             d:DesignWidth="300">
+    <Expander
+        HorizontalAlignment="Stretch"
+        materialDesign:ExpanderAssist.HorizontalHeaderPadding="0, 0, 0, 0"
+        Header="{Binding HeaderText, ElementName=Root}"
+        IsExpanded="{Binding IsExpanded, ElementName=Root}">
+        <Grid>
+            <TextBlock
+                Margin="0 10"
+                Text="{Binding NoSelectionText, ElementName=Root}"
+                Opacity="0.75"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding SelectedItem, ElementName=Root}" Value="{x:Null}">
+                                <Setter Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+
+        <Grid x:Name="TagsDropZone"
+              Margin="0 10"
+              AllowDrop="True"
+              Background="Transparent"
+              DragOver="TagsDropZone_DragOver"
+              Drop="TagsDropZone_Drop">
+            <Grid.Style>
+                <Style TargetType="Grid">
+                    <Setter Property="Visibility" Value="Visible" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding SelectedItem, ElementName=Root}" Value="{x:Null}">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Grid.Style>
+            <ItemsControl
+                x:Name="ItemTagsList"
+                HorizontalAlignment="Stretch"
+                ItemsSource="{Binding ItemsSource, ElementName=Root}"
+                d:ItemsSource="{d:SampleData ItemCount=3}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <local:Tag_V2
+                            DataContext="{Binding}"
+                            IsPickUpable="False"
+                            FilterEnabled="False" />
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+            </ItemsControl>
+
+            <Grid
+                x:Name="DropHintOverlay"
+                d:Visibility="Visible"
+                IsHitTestVisible="False">
+                <Grid.Style>
+                    <Style TargetType="Grid">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding ElementName=ItemTagsList, Path=HasItems}" Value="False">
+                                <Setter Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Grid.Style>
+                <Rectangle
+                    HorizontalAlignment="Stretch"
+                    VerticalAlignment="Stretch"
+                    MinHeight="40"
+                    Fill="{DynamicResource MaterialDesignDarkSeparatorBackground}"
+                    Stroke="{DynamicResource MaterialDesignLightSeparatorBackground}"
+                    StrokeThickness="2"
+                    StrokeDashArray="1.0 1.0"
+                    RadiusX="8"
+                    RadiusY="8" />
+
+                <TextBlock
+                    Text="No tags applied to selected item. Drop tags here to add one."
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding ElementName=ItemTagsList, Path=HasItems}" Value="False">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+            </Grid>
+        </Grid>
+        </Grid>
+    </Expander>
+</UserControl>

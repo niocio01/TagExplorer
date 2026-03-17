@@ -11,7 +11,86 @@ namespace TagExplorer.Views
     /// </summary>
     public partial class Tag_V2
     {
+        public static readonly DependencyProperty ClickCommandProperty =
+            DependencyProperty.Register(
+                nameof(ClickCommand),
+                typeof(ICommand),
+                typeof(Tag_V2),
+                new PropertyMetadata(null));
+
+        public static readonly DependencyProperty ClickCommandParameterProperty =
+            DependencyProperty.Register(
+                nameof(ClickCommandParameter),
+                typeof(object),
+                typeof(Tag_V2),
+                new PropertyMetadata(null));
+
+        public static readonly DependencyProperty RightClickCommandProperty =
+            DependencyProperty.Register(
+                nameof(RightClickCommand),
+                typeof(ICommand),
+                typeof(Tag_V2),
+                new PropertyMetadata(null));
+
+        public static readonly DependencyProperty RightClickCommandParameterProperty =
+            DependencyProperty.Register(
+                nameof(RightClickCommandParameter),
+                typeof(object),
+                typeof(Tag_V2),
+                new PropertyMetadata(null));
+
+        public static readonly DependencyProperty IsPickUpableProperty =
+            DependencyProperty.Register(
+                nameof(IsPickUpable),
+                typeof(bool),
+                typeof(Tag_V2),
+                new PropertyMetadata(true));
+
+        public static readonly DependencyProperty FilterEnabledProperty =
+            DependencyProperty.Register(
+                nameof(FilterEnabled),
+                typeof(bool),
+                typeof(Tag_V2),
+                new PropertyMetadata(true));
+
         private Point _dragStartPoint;
+        private bool _wasDragged;
+
+        public ICommand? ClickCommand
+        {
+            get => (ICommand?)GetValue(ClickCommandProperty);
+            set => SetValue(ClickCommandProperty, value);
+        }
+
+        public object? ClickCommandParameter
+        {
+            get => GetValue(ClickCommandParameterProperty);
+            set => SetValue(ClickCommandParameterProperty, value);
+        }
+
+        public bool IsPickUpable
+        {
+            get => (bool)GetValue(IsPickUpableProperty);
+            set => SetValue(IsPickUpableProperty, value);
+        }
+
+        public ICommand? RightClickCommand
+        {
+            get => (ICommand?)GetValue(RightClickCommandProperty);
+            set => SetValue(RightClickCommandProperty, value);
+        }
+
+        public object? RightClickCommandParameter
+        {
+            get => GetValue(RightClickCommandParameterProperty);
+            set => SetValue(RightClickCommandParameterProperty, value);
+        }
+
+        public bool FilterEnabled
+        {
+            get => (bool)GetValue(FilterEnabledProperty);
+            set => SetValue(FilterEnabledProperty, value);
+        }
 
         public Tag_V2()
         {
@@ -21,10 +100,16 @@ namespace TagExplorer.Views
         private void Grid_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             _dragStartPoint = e.GetPosition(this);
+            _wasDragged = false;
         }
 
         private void Grid_PreviewMouseMove(object sender, MouseEventArgs e)
         {
+            if (!IsPickUpable)
+            {
+                return;
+            }
+
             if (e.LeftButton != MouseButtonState.Pressed)
             {
                 return;
@@ -41,6 +126,7 @@ namespace TagExplorer.Views
 
             if (DataContext is FilterTag tag)
             {
+                _wasDragged = true;
                 TagDragState.SetDragging(true);
                 try
                 {
@@ -50,6 +136,57 @@ namespace TagExplorer.Views
                 {
                     TagDragState.SetDragging(false);
                 }
+            }
+        }
+
+        [RelayCommand]
+        private void HandleLeftClick()
+        {
+            if (_wasDragged)
+            {
+                _wasDragged = false;
+                return;
+            }
+
+            if (FilterEnabled)
+            {
+                if (DataContext is Filter filter && filter.ToggleRequiredFilterCommand.CanExecute(null))
+                {
+                    filter.ToggleRequiredFilterCommand.Execute(null);
+                }
+
+                return;
+            }
+
+            var parameter = ClickCommandParameter ?? DataContext;
+            if (ClickCommand?.CanExecute(parameter) == true)
+            {
+                ClickCommand.Execute(parameter);
+            }
+        }
+
+        [RelayCommand]
+        private void HandleRightClick()
+        {
+            if (_wasDragged)
+            {
+                _wasDragged = false;
+                return;
+            }
+
+            if (!FilterEnabled)
+            {
+                var parameter = RightClickCommandParameter ?? ClickCommandParameter ?? DataContext;
+                if (RightClickCommand?.CanExecute(parameter) == true)
+                {
+                    RightClickCommand.Execute(parameter);
+                }
+                return;
+            }
+
+            if (DataContext is Filter filter && filter.ToggleDisallowedFilterCommand.CanExecute(null))
+            {
+                filter.ToggleDisallowedFilterCommand.Execute(null);
             }
         }
     }

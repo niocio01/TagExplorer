@@ -13,6 +13,7 @@
              d:DataContext="{d:DesignInstance Type=models:FilterTag, IsDesignTimeCreatable=True}">
 
     <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibility" />
         <Style x:Key="Style" TargetType="materialDesign:Chip" BasedOn="{StaticResource MaterialDesignOutlineChip}">
             <Style.Triggers>
                 <DataTrigger Binding="{Binding Path=FilterType}" Value="{x:Static main:FilterTypes.Required}">
@@ -35,11 +36,11 @@
             d:Content="Tag Name"
             IconBackground="{Binding Path=Color.HexCode}"
             d:IconBackground="#FF0000"
-            Command="{Binding Path=ToggleRequiredFilterCommand}"
+            Command="{Binding HandleLeftClickCommand, ElementName=Root}"
             Style="{StaticResource Style}"
             ToolTip="{Binding Path=Description}">
             <materialDesign:Chip.InputBindings>
-                <MouseBinding Gesture="RightClick" Command="{Binding ToggleDisallowedFilterCommand}" />
+                <MouseBinding Gesture="RightClick" Command="{Binding HandleRightClickCommand, ElementName=Root}" />
             </materialDesign:Chip.InputBindings>
             <materialDesign:Chip.Icon>
                 <materialDesign:PackIcon
@@ -48,6 +49,6 @@
             </materialDesign:Chip.Icon>
         </materialDesign:Chip>
 
-        <local:Filter_V />
+        <local:Filter_V Visibility="{Binding FilterEnabled, ElementName=Root, Converter={StaticResource BooleanToVisibility}}" />
     </Grid>
 </UserControl>

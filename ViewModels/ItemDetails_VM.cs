@@ -88,6 +88,12 @@ public partial class ItemDetails_VM : ObservableObject
         };
     }
 
+    [RelayCommand]
+    private void HandleTagListDropped(object? dropData)
+    {
+        TryAddDroppedTag(dropData);
+    }
+
     private bool AddTagToSelectedItem(FilterTag tag)
     {
         var key = GetItemKey(SelectedItem);
