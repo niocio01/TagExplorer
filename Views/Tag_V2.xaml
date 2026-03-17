@@ -27,7 +27,8 @@
             </Style.Triggers>
         </Style>
     </UserControl.Resources>
-    <Grid>
+    <Grid PreviewMouseLeftButtonDown="Grid_PreviewMouseLeftButtonDown"
+          PreviewMouseMove="Grid_PreviewMouseMove">
 
         <materialDesign:Chip
             Content="{Binding Path=Name}"

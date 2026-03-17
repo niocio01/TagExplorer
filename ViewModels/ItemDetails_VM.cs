@@ -1,7 +1,10 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Windows;
 using TagExplorer.Models;
 using File = TagExplorer.Models.File;
@@ -11,6 +14,8 @@ namespace TagExplorer.ViewModels;
 
 public partial class ItemDetails_VM : ObservableObject
 {
+    private readonly Dictionary<string, List<FilterTag>> _tagsByItemKey = new(StringComparer.OrdinalIgnoreCase);
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(SelectedItemName))]
     [NotifyPropertyChangedFor(nameof(SelectedItemIconString))]
@@ -20,6 +25,9 @@ public partial class ItemDetails_VM : ObservableObject
     [NotifyPropertyChangedFor(nameof(ItemCreated))]
     [NotifyPropertyChangedFor(nameof(ItemLastModified))]
     private ExplorerItem? _selectedItem;
+
+    [ObservableProperty]
+    private ObservableCollection<FilterTag> _selectedItemTags = [];
 
     public string SelectedItemName => SelectedItem?.Name ?? "No Item Selected";
 
@@ -68,6 +76,85 @@ public partial class ItemDetails_VM : ObservableObject
         {
             Clipboard.SetText(ItemPath);
         }
+    }
+
+    public bool TryAddDroppedTag(object? dropData)
+    {
+        return dropData switch
+        {
+            FilterTag filterTag => AddTagToSelectedItem(filterTag),
+            Tag_VM tagVm => AddTagToSelectedItem(new FilterTag(tagVm.Tag)),
+            _ => false
+        };
+    }
+
+    private bool AddTagToSelectedItem(FilterTag tag)
+    {
+        var key = GetItemKey(SelectedItem);
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            return false;
+        }
+
+        if (!_tagsByItemKey.TryGetValue(key, out var storedTags))
+        {
+            storedTags = [];
+            _tagsByItemKey[key] = storedTags;
+        }
+
+        if (storedTags.Any(existing => string.Equals(existing.Name, tag.Name, StringComparison.OrdinalIgnoreCase)))
+        {
+            return false;
+        }
+
+        var tagCopy = new FilterTag
+        {
+            Name = tag.Name,
+            Description = tag.Description,
+            IconName = tag.IconName,
+            Color = tag.Color,
+            Aliases = tag.Aliases,
+            IsSystemTag = tag.IsSystemTag,
+            Parent = tag.Parent,
+            Children = tag.Children,
+            FilterType = FilterTypes.None
+        };
+
+        storedTags.Add(tagCopy);
+        SelectedItemTags.Add(tagCopy);
+        return true;
+    }
+
+    partial void OnSelectedItemChanged(ExplorerItem? value)
+    {
+        SelectedItemTags.Clear();
+
+        var key = GetItemKey(value);
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            return;
+        }
+
+        if (!_tagsByItemKey.TryGetValue(key, out var storedTags))
+        {
+            return;
+        }
+
+        foreach (var tag in storedTags)
+        {
+            SelectedItemTags.Add(tag);
+        }
+    }
+
+    private static string? GetItemKey(ExplorerItem? item)
+    {
+        return item switch
+        {
+            null => null,
+            File file => file.FullPath,
+            Folder folder => folder.Path,
+            _ => null
+        };
     }
 
     private string GetDateDisplay(bool isCreated)
