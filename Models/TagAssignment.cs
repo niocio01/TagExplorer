@@ -1,38 +1,58 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿namespace TagExplorer.Models;
 
-namespace TagExplorer.Models;
-
-public abstract class TagAssignment
+public enum AssignmentKind
 {
-    public enum RelationType
-    {
-        Folder,
-        File,
-        Parent,
-        Tag,
-    }
-
-    public int? Id { get; set; }
-    public RelationType? Type { get; protected set; }
-    public int? TagId { get; protected set; }
-    public int? RelationId { get; protected set; }
+    Manual = 0,
+    AutoDirectChildrenAsChildTag = 10 // Tag first descendants of a folder with child tags.
 }
 
-public class FolderTagAssignment : TagAssignment
+public enum ApplyScope
 {
-    public FolderTagAssignment(int tagId, int folderId)
-    {
-        TagId = tagId;
-        RelationId = folderId;
-        Type = RelationType.Folder;
-    }
+    Self = 0,
+    SelfAndDirectDescendants = 1,
+    SelfAndAllDescendants = 2
+}
 
-    public FolderTagAssignment(int id, int tagId, int folderId) : this(tagId, folderId)
+public enum TargetType
+{
+    Folder = 0,
+    File = 1
+}
+
+public sealed class TagAssignment
+{
+    public int Id { get; set; }
+
+    public AssignmentKind Kind { get; set; }
+
+    public ApplyScope Scope { get; set; }
+
+    public TargetType TargetType { get; set; }
+
+    public required string TargetPath { get; set; }
+
+    public int? TagId { get; set; }
+
+    public int? ParentTagId { get; set; }
+
+    public bool MatchByAlias { get; set; } = true;
+
+    public bool Enabled { get; set; } = true;
+
+    public bool IsValid()
     {
-        Id = id;
+        return Kind switch
+        {
+            AssignmentKind.Manual =>
+                TagId.HasValue &&
+                ParentTagId is null,
+
+            AssignmentKind.AutoDirectChildrenAsChildTag =>
+                TargetType == TargetType.Folder &&
+                TagId is null &&
+                ParentTagId.HasValue,
+
+            _ => false
+        };
     }
 }
