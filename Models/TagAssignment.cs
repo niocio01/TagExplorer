@@ -23,6 +23,14 @@ public sealed class TagAssignment
 {
     public int Id { get; set; }
 
+    public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+
+    public DateTime UpdatedAtUtc { get; set; } = DateTime.UtcNow;
+
+    public string? CreatedBy { get; set; }
+
+    public bool IsArchived { get; set; }
+
     public AssignmentKind Kind { get; set; }
 
     public ApplyScope Scope { get; set; }

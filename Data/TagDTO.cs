@@ -7,6 +7,15 @@ public class TagDTO
 {
     [Key]
     public int Id { get; set; }
+
+    public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+
+    public DateTime UpdatedAtUtc { get; set; } = DateTime.UtcNow;
+
+    [Column(TypeName = "varchar(20)")]
+    public string? CreatedBy { get; set; }
+
+    public bool IsArchived { get; set; }
     
     [Column(TypeName = "varchar(50)")]
     public string Name { get; set; }
