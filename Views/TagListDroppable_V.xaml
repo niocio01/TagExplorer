@@ -56,10 +56,18 @@
                 d:ItemsSource="{d:SampleData ItemCount=3}">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
-                        <local:Tag_V2
+                        <local:TagBase_V
                             DataContext="{Binding}"
-                            IsPickUpable="False"
-                            FilterEnabled="False" />
+                            IsPickUpable="False">
+                            <local:TagBase_V.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem
+                                        Header="Remove tag"
+                                        Command="{Binding RemoveTagCommand, Source={x:Reference Root}}"
+                                        CommandParameter="{Binding}" />
+                                </ContextMenu>
+                            </local:TagBase_V.ContextMenu>
+                        </local:TagBase_V>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
                 <ItemsControl.ItemsPanel>

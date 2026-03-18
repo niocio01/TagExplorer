@@ -16,6 +16,16 @@
         <c:InverseBooleanConverter x:Key="InverseBool"/>
         <c:BooleanToString x:Key="BoolToEditModeString" TrueString="New Tag" FalseString="Edit Tag"/>
         <c:BooleanToString x:Key="BoolToSaveButtonString" TrueString="Create Tag" FalseString="Save Changes"/>
+        <Style x:Key="TagOverviewChipStyle" TargetType="materialDesign:Chip" BasedOn="{StaticResource MaterialDesignOutlineChip}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Path=IsSelected}" Value="True">
+                    <Setter Property="BorderBrush" Value="{Binding Path=Color.HexCode}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Path=IsSelected}" Value="False">
+                    <Setter Property="BorderBrush" Value="{DynamicResource MaterialDesign.Brush.Chip.OutlineBorder}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
     </UserControl.Resources>
     <Grid>
         <Grid.ColumnDefinitions>
@@ -37,7 +47,11 @@
                     ItemsSource="{Binding Path=TagVMs}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <local:Tag_V DataContext="{Binding}" />
+                            <local:TagBase_V
+                                DataContext="{Binding}"
+                                IsPickUpable="False"
+                                ChipStyle="{StaticResource TagOverviewChipStyle}"
+                                ClickCommand="{Binding PressTagCommand}" />
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                     <ItemsControl.ItemsPanel>
@@ -162,7 +176,11 @@
                     Margin="10 10 10 10">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <local:Tag_V DataContext="{Binding}"/>
+                            <local:TagBase_V
+                                DataContext="{Binding}"
+                                IsPickUpable="False"
+                                ChipStyle="{StaticResource TagOverviewChipStyle}"
+                                ClickCommand="{Binding PressTagCommand}" />
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                     <ItemsControl.ItemsPanel>

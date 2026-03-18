@@ -269,7 +269,7 @@
                         d:ItemsSource="{d:SampleData ItemCount=5}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <local:Tag_V2 DataContext="{Binding}" />
+                                <local:FilterTag_V DataContext="{Binding}" />
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                         <ItemsControl.ItemsPanel>

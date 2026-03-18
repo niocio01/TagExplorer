@@ -1,0 +1,40 @@
+<UserControl x:Class="TagExplorer.Views.FilterTag_V"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:local="clr-namespace:TagExplorer.Views"
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+             xmlns:models="clr-namespace:TagExplorer.Models"
+             xmlns:main="clr-namespace:TagExplorer"
+             mc:Ignorable="d"
+             x:Name="Root"
+             d:DataContext="{d:DesignInstance Type=models:FilterTag, IsDesignTimeCreatable=True}">
+
+    <UserControl.Resources>
+        <Style x:Key="FilterTagChipStyle" TargetType="materialDesign:Chip" BasedOn="{StaticResource MaterialDesignOutlineChip}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Path=FilterType}" Value="{x:Static main:FilterTypes.Required}">
+                    <Setter Property="BorderBrush" Value="{DynamicResource MaterialDesign.Brush.Primary}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Path=FilterType}" Value="{x:Static main:FilterTypes.Disallowed}">
+                    <Setter Property="BorderBrush" Value="{DynamicResource MaterialDesign.Brush.Secondary}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Path=FilterType}" Value="{x:Static main:FilterTypes.None}">
+                    <Setter Property="BorderBrush" Value="{DynamicResource MaterialDesign.Brush.Chip.OutlineBorder}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid>
+        <local:TagBase_V
+            DataContext="{Binding}"
+            IsPickUpable="True"
+            ChipStyle="{StaticResource FilterTagChipStyle}"
+            ClickCommand="{Binding HandleLeftClickCommand, ElementName=Root}"
+            RightClickCommand="{Binding HandleRightClickCommand, ElementName=Root}" />
+
+        <local:Filter_V />
+    </Grid>
+</UserControl>

@@ -31,6 +31,13 @@ public partial class TagListDroppable_V : UserControl
             typeof(TagListDroppable_V),
             new PropertyMetadata(null));
 
+    public static readonly DependencyProperty RemoveTagCommandProperty =
+        DependencyProperty.Register(
+            nameof(RemoveTagCommand),
+            typeof(ICommand),
+            typeof(TagListDroppable_V),
+            new PropertyMetadata(null));
+
     public static readonly DependencyProperty HeaderTextProperty =
         DependencyProperty.Register(
             nameof(HeaderText),
@@ -68,6 +75,12 @@ public partial class TagListDroppable_V : UserControl
     {
         get => (ICommand?)GetValue(TagDroppedCommandProperty);
         set => SetValue(TagDroppedCommandProperty, value);
+    }
+
+    public ICommand? RemoveTagCommand
+    {
+        get => (ICommand?)GetValue(RemoveTagCommandProperty);
+        set => SetValue(RemoveTagCommandProperty, value);
     }
 
     public string HeaderText

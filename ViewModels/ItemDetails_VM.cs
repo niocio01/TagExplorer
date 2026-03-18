@@ -94,6 +94,42 @@ public partial class ItemDetails_VM : ObservableObject
         TryAddDroppedTag(dropData);
     }
 
+    [RelayCommand]
+    private void HandleRemoveTag(object? tagData)
+    {
+        if (tagData is not FilterTag tag)
+        {
+            return;
+        }
+
+        var key = GetItemKey(SelectedItem);
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            return;
+        }
+
+        if (!_tagsByItemKey.TryGetValue(key, out var storedTags))
+        {
+            return;
+        }
+
+        var removedFromStore = storedTags.RemoveAll(existing =>
+            string.Equals(existing.Name, tag.Name, StringComparison.OrdinalIgnoreCase)) > 0;
+
+        if (!removedFromStore)
+        {
+            return;
+        }
+
+        for (var i = SelectedItemTags.Count - 1; i >= 0; i--)
+        {
+            if (string.Equals(SelectedItemTags[i].Name, tag.Name, StringComparison.OrdinalIgnoreCase))
+            {
+                SelectedItemTags.RemoveAt(i);
+            }
+        }
+    }
+
     private bool AddTagToSelectedItem(FilterTag tag)
     {
         var key = GetItemKey(SelectedItem);

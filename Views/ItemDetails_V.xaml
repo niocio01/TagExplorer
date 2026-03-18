@@ -112,7 +112,8 @@
             Grid.Row="4"
             ItemsSource="{Binding SelectedItemTags}"
             SelectedItem="{Binding SelectedItem}"
-            TagDroppedCommand="{Binding HandleTagListDroppedCommand}">
+            TagDroppedCommand="{Binding HandleTagListDroppedCommand}"
+            RemoveTagCommand="{Binding HandleRemoveTagCommand}">
         </local:TagListDroppable_V>
     </Grid>
 </UserControl>

@@ -1,0 +1,38 @@
+<UserControl x:Class="TagExplorer.Views.TagBase_V"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:models="clr-namespace:TagExplorer.Models"
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+             mc:Ignorable="d"
+             x:Name="Root"
+             d:DataContext="{d:DesignInstance Type=models:AppliedTag, IsDesignTimeCreatable=True}">
+
+    <UserControl.Resources>
+        <Style x:Key="DefaultChipStyle" TargetType="materialDesign:Chip" BasedOn="{StaticResource MaterialDesignOutlineChip}" />
+    </UserControl.Resources>
+
+    <Grid PreviewMouseLeftButtonDown="Grid_PreviewMouseLeftButtonDown"
+          PreviewMouseMove="Grid_PreviewMouseMove">
+
+        <materialDesign:Chip
+            Content="{Binding Path=Name}"
+            d:Content="Tag Name"
+            IconBackground="{Binding Path=Color.HexCode}"
+            d:IconBackground="#FF0000"
+            Command="{Binding HandleLeftClickCommand, ElementName=Root}"
+            Style="{Binding ChipStyle, ElementName=Root, TargetNullValue={StaticResource DefaultChipStyle}}"
+            ToolTip="{Binding Path=Description}">
+            <materialDesign:Chip.InputBindings>
+                <MouseBinding Gesture="RightClick" Command="{Binding HandleRightClickCommand, ElementName=Root}" />
+            </materialDesign:Chip.InputBindings>
+            <materialDesign:Chip.Icon>
+                <materialDesign:PackIcon
+                    Kind="{Binding Path=IconName}"
+                    d:Kind="numeric1CircleOutline"
+                    ToolTip="Tag icon" />
+            </materialDesign:Chip.Icon>
+        </materialDesign:Chip>
+    </Grid>
+</UserControl>
