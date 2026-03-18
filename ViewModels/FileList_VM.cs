@@ -110,7 +110,7 @@ public partial class FileList_VM : ObservableObject
         RebuildFilteredItems();
     }
 
-    public void SetHomeItems(IEnumerable<FolderBase> folderBases)
+    public void SetHomeItems(IEnumerable<BaseFolder> folderBases)
     {
         _currentFolder = null;
         OnPropertyChanged(nameof(CurrentFolderPath));

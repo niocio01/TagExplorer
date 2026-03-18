@@ -187,7 +187,7 @@ public partial class Explorer_VM : ObservableObject
             return;
         }
 
-        FileList.SetHomeItems(_db.Folders);
+        FileList.SetHomeItems(_db.BaseFolders);
     }
 
     private void SetCurrentFolderItems(Folder newCurrentFolder)

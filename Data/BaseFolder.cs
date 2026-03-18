@@ -2,11 +2,17 @@
 
 namespace TagExplorer.Data;
 
-public class BaseFolder : FolderBase
+public class BaseFolder
 {
+    public int Id { get; set; }
+
     [Required]
     [MaxLength(255)]
-    public override String Path { get; set; }
+    public string Name { get; set; }
+
+    [Required]
+    [MaxLength(255)]
+    public string Path { get; set; }
 
     public BaseFolder()
     {

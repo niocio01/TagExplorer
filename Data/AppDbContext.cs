@@ -25,15 +25,15 @@ public class AppDbContext : DbContext
     public DbSet<TagDTO> Tags { get; set; }
     public DbSet<IconFavourite?> IconFavourites { get; set; }
 
-    public DbSet<FolderBase> Folders { get; set; }
     public DbSet<TagAssignment> TagAssignments { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<FolderBase>()
-            .HasDiscriminator<string>("FolderType")
-            .HasValue<Folder>("Folder")
-            .HasValue<BaseFolder>("BaseFolder");
+        modelBuilder.Entity<TagDTO>()
+            .HasIndex(t => t.Name);
+
+        modelBuilder.Entity<BaseFolder>()
+            .ToTable("Folders");
 
         modelBuilder.Entity<TagAssignment>(entity =>
         {
