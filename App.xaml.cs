@@ -5,6 +5,7 @@ using Microsoft.Extensions.Hosting;
 using System.IO;
 using System.Windows;
 using TagExplorer.Data;
+using TagExplorer.Services;
 using TagExplorer.ViewModels;
 using TagExplorer.Views;
 using SystemColors = TagExplorer.Data.SystemColors;
@@ -28,6 +29,7 @@ public partial class App : Application
             .ConfigureServices((hostContext, services) =>
             {
                 services.AddDbContext<AppDbContext>();
+                services.AddScoped<TagAssignmentService>();
 
                 services.AddScoped<ViewModels.MainWindow_VM>();
                 services.AddSingleton<MainWindow>(s => new MainWindow

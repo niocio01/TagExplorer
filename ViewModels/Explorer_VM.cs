@@ -77,11 +77,12 @@ public partial class Explorer_VM : ObservableObject
     public Explorer_VM()
     {
         _db = App.AppHost?.Services.GetService<AppDbContext>();
+        var tagAssignmentService = App.AppHost?.Services.GetService<TagAssignmentService>();
 
-        FileList = new FileList_VM();
+        FileList = new FileList_VM(tagAssignmentService);
         FileList.FolderDoubleClicked += FileListFolderDoubleClicked;
         FileList.SelectedItemChanged += FileListSelectedItemChanged;
-        ItemDetails = new ItemDetails_VM();
+        ItemDetails = new ItemDetails_VM(tagAssignmentService);
         _breadcrumbsHistory = new ObservableCollection<List<Folder>>();
 
         AllFilterTags = new ObservableCollection<FilterTag>();
@@ -117,6 +118,8 @@ public partial class Explorer_VM : ObservableObject
     {
         RequiredTagFilterCount = _requiredTagFilters.Count;
         DisallowedTagFilterCount = _disallowedTagFilters.Count;
+
+        ApplyFileListFilters(reloadCurrentFolder: false);
     }
 
     private void ExtentionFilterTypeChanged(object? sender, FilterTypes e)
@@ -321,6 +324,8 @@ public partial class Explorer_VM : ObservableObject
             ShowFolders,
             ShowHiddenFiles,
             _requiredExtentionFilters.Select(filter => filter.FileType.Extension),
+            _requiredTagFilters.Where(tag => tag.Id.HasValue).Select(tag => tag.Id!.Value),
+            _disallowedTagFilters.Where(tag => tag.Id.HasValue).Select(tag => tag.Id!.Value),
             reloadCurrentFolder);
     }
 }

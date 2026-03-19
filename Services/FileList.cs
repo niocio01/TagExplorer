@@ -12,7 +12,10 @@ public readonly record struct FileListFilterOptions(
     string? CurrentFolderPath,
     bool ShowHiddenFiles,
     bool CurrentItemsExcludeHidden,
-    IReadOnlySet<string> RequiredExtensions);
+    IReadOnlySet<string> RequiredExtensions,
+    IReadOnlySet<int> RequiredTagIds,
+    IReadOnlySet<int> DisallowedTagIds,
+    Func<ExplorerItem, bool>? MatchesTagFilter);
 
 public static class FileList
 {
@@ -105,7 +108,17 @@ public static class FileList
         if (!options.ShowHiddenFiles && !options.CurrentItemsExcludeHidden && IsHiddenItem(item))
             return false;
 
-        return MatchesExtensionFilter(item, options.RequiredExtensions);
+        if (!MatchesExtensionFilter(item, options.RequiredExtensions))
+        {
+            return false;
+        }
+
+        if (options.RequiredTagIds.Count == 0 && options.DisallowedTagIds.Count == 0)
+        {
+            return true;
+        }
+
+        return options.MatchesTagFilter?.Invoke(item) == true;
     }
 
     private static int GetDepth(string rootPath, string currentPath)

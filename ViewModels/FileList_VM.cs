@@ -56,6 +56,12 @@ public partial class FileList_VM : ObservableObject
     private bool _showFolders = true;
     private bool _showHiddenFiles;
     private readonly HashSet<string> _requiredExtensionsCache = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<int> _requiredTagIdsCache = [];
+    private readonly HashSet<int> _disallowedTagIdsCache = [];
+    private readonly TagAssignmentService? _tagAssignmentService;
+    private IReadOnlyDictionary<string, HashSet<int>> _manualTagIdsByPath =
+        new Dictionary<string, HashSet<int>>(StringComparer.OrdinalIgnoreCase);
+    private List<BaseFolder> _homeBaseFolders = [];
     private Folder? _currentFolder;
 
     public string? CurrentFolderPath => _currentFolder?.Path;
@@ -69,14 +75,19 @@ public partial class FileList_VM : ObservableObject
         _currentFolder?.Path,
         _showHiddenFiles,
         _currentItemsExcludeHidden,
-        _requiredExtensionsCache);
+        _requiredExtensionsCache,
+        _requiredTagIdsCache,
+        _disallowedTagIdsCache,
+        MatchesTagFilters);
 
     private bool HasActiveFileFilters => _requiredExtensionsCache.Count > 0;
+    private bool HasActiveTagFilters => _requiredTagIdsCache.Count > 0 || _disallowedTagIdsCache.Count > 0;
 
-    private bool IncludeSubdirectoriesForSearch => _doRecursiveSearch && HasActiveFileFilters;
+    private bool IncludeSubdirectoriesForSearch => _doRecursiveSearch && (HasActiveFileFilters || HasActiveTagFilters);
 
-    public FileList_VM()
+    public FileList_VM(TagAssignmentService? tagAssignmentService = null)
     {
+        _tagAssignmentService = tagAssignmentService;
         CurrentFolderItems = new ObservableCollection<ExplorerItem>();
         FilteredFolderItems = new ObservableCollection<ExplorerItem>();
         FilteredFolderItems.CollectionChanged += OnFilteredFolderItemsCollectionChanged;
@@ -87,6 +98,8 @@ public partial class FileList_VM : ObservableObject
         bool showFolders,
         bool showHiddenFiles,
         IEnumerable<string> requiredExtensions,
+        IEnumerable<int> requiredTagIds,
+        IEnumerable<int> disallowedTagIds,
         bool reloadCurrentFolder)
     {
         var previousIncludeSubdirectoriesForSearch = IncludeSubdirectoriesForSearch;
@@ -96,8 +109,22 @@ public partial class FileList_VM : ObservableObject
         _showHiddenFiles = showHiddenFiles;
 
         FileList.RebuildRequiredExtensions(_requiredExtensionsCache, requiredExtensions);
+        RebuildRequiredTagIds(_requiredTagIdsCache, requiredTagIds);
+        RebuildRequiredTagIds(_disallowedTagIdsCache, disallowedTagIds);
 
         var includeSubdirectoriesForSearchChanged = previousIncludeSubdirectoriesForSearch != IncludeSubdirectoriesForSearch;
+
+        if (_currentFolder is null)
+        {
+            if (HasActiveFileFilters || HasActiveTagFilters)
+            {
+                LoadHomeItemsForFiltering();
+                return;
+            }
+
+            SetHomeItems(_homeBaseFolders);
+            return;
+        }
 
         if ((reloadCurrentFolder || includeSubdirectoriesForSearchChanged)
             && _currentFolder is not null
@@ -112,6 +139,7 @@ public partial class FileList_VM : ObservableObject
 
     public void SetHomeItems(IEnumerable<BaseFolder> folderBases)
     {
+        _homeBaseFolders = [.. folderBases];
         _currentFolder = null;
         OnPropertyChanged(nameof(CurrentFolderPath));
         _currentItemsExcludeHidden = false;
@@ -119,10 +147,109 @@ public partial class FileList_VM : ObservableObject
         CurrentFolderItems.Clear();
         FilteredFolderItems.Clear();
 
-        foreach (var folderBase in folderBases)
+        foreach (var folderBase in _homeBaseFolders)
         {
             var folder = new Folder(folderBase.Path, folderBase.Name);
             FileList.AddItem(folder, CurrentFolderItems, FilteredFolderItems, FileListFilterOptions);
+        }
+
+        RefreshTagFilterCache(CurrentFolderItems);
+    }
+
+    private void LoadHomeItemsForFiltering()
+    {
+        _ = LoadHomeItemsForFilteringAsync();
+    }
+
+    private async Task LoadHomeItemsForFilteringAsync()
+    {
+        var requestId = Interlocked.Increment(ref _activeSearchRequestId);
+
+        var previousSearchCts = _itemSearchCts;
+        var currentSearchCts = new CancellationTokenSource();
+        _itemSearchCts = currentSearchCts;
+
+        previousSearchCts?.Cancel();
+        previousSearchCts?.Dispose();
+
+        var cancellationToken = currentSearchCts.Token;
+        var includeSubdirectories = _doRecursiveSearch;
+        _currentItemsExcludeHidden = !_showHiddenFiles;
+
+        BeginSearchProgress();
+
+        CurrentFolderItems.Clear();
+        FilteredFolderItems.Clear();
+
+        var combinedItems = new List<ExplorerItem>();
+
+        try
+        {
+            foreach (var baseFolder in _homeBaseFolders)
+            {
+                if (!IsLatestSearchRequest(requestId) || cancellationToken.IsCancellationRequested)
+                {
+                    return;
+                }
+
+                var rootFolder = new Folder(baseFolder.Path, baseFolder.Name);
+                combinedItems.Add(rootFolder);
+
+                if (_itemSearchService.TryGetCachedAllItems(rootFolder.Path, includeSubdirectories, _showHiddenFiles, out var cachedItems))
+                {
+                    combinedItems.AddRange(cachedItems);
+                    continue;
+                }
+
+                await _itemSearchService.SearchAsync(
+                    rootFolder,
+                    includeSubdirectories,
+                    _showHiddenFiles,
+                    onItem: item => combinedItems.Add(item),
+                    cancellationToken: cancellationToken);
+            }
+
+            if (!IsLatestSearchRequest(requestId) || cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
+
+            var populationCompleted = await FileList.PopulateCurrentAndFilteredAsync(
+                combinedItems,
+                CurrentFolderItems,
+                FilteredFolderItems,
+                FileListFilterOptions,
+                UiItemBatchSize,
+                () => IsLatestSearchRequest(requestId),
+                cancellationToken);
+
+            if (!populationCompleted)
+            {
+                return;
+            }
+
+            RefreshTagFilterCache(CurrentFolderItems);
+
+            if (HasActiveTagFilters)
+            {
+                RebuildFilteredItems();
+            }
+
+            if (IsLatestSearchRequest(requestId) && !cancellationToken.IsCancellationRequested)
+            {
+                ScannedFolderCount = combinedItems.Count(item => item is Folder);
+                ScannedFileCount = combinedItems.Count(item => item is File);
+                ScannedDepth = _doRecursiveSearch ? 1 : 0;
+                EstimatedSearchProgress = 100;
+                IsSearching = false;
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            if (IsLatestSearchRequest(requestId))
+            {
+                IsSearching = false;
+            }
         }
     }
 
@@ -176,6 +303,8 @@ public partial class FileList_VM : ObservableObject
             {
                 return;
             }
+
+            RefreshTagFilterCache(cachedItems);
 
             var cachedPopulationCompleted = await FileList.PopulateCurrentAndFilteredAsync(
                 cachedItems,
@@ -335,6 +464,13 @@ public partial class FileList_VM : ObservableObject
                 FlushBufferedItemsOnUi();
             });
 
+            RefreshTagFilterCache(CurrentFolderItems);
+
+            if (HasActiveTagFilters)
+            {
+                RebuildFilteredItems();
+            }
+
             if (IsLatestSearchRequest(requestId) && !cancellationToken.IsCancellationRequested)
             {
                 EstimatedSearchProgress = 100;
@@ -434,6 +570,7 @@ public partial class FileList_VM : ObservableObject
 
         var cancellationToken = currentCts.Token;
         var snapshot = CurrentFolderItems.ToList();
+        RefreshTagFilterCache(snapshot);
 
         await FileList.RebuildFilteredItemsAsync(
             snapshot,
@@ -445,6 +582,74 @@ public partial class FileList_VM : ObservableObject
         if (requestId != Volatile.Read(ref _activeFilterRebuildRequestId) || cancellationToken.IsCancellationRequested)
         {
             return;
+        }
+    }
+
+    private bool MatchesTagFilters(ExplorerItem item)
+    {
+        if (_requiredTagIdsCache.Count == 0 && _disallowedTagIdsCache.Count == 0)
+        {
+            return true;
+        }
+
+        if (!TryGetItemPath(item, out var normalizedPath))
+        {
+            return _requiredTagIdsCache.Count == 0;
+        }
+
+        _manualTagIdsByPath.TryGetValue(normalizedPath, out var itemTagIds);
+        itemTagIds ??= [];
+
+        if (_disallowedTagIdsCache.Count > 0 && itemTagIds.Any(tagId => _disallowedTagIdsCache.Contains(tagId)))
+        {
+            return false;
+        }
+
+        if (_requiredTagIdsCache.Count == 0)
+        {
+            return true;
+        }
+
+        return _requiredTagIdsCache.All(itemTagIds.Contains);
+    }
+
+    private void RefreshTagFilterCache(IEnumerable<ExplorerItem> items)
+    {
+        if (_requiredTagIdsCache.Count == 0 && _disallowedTagIdsCache.Count == 0)
+        {
+            _manualTagIdsByPath = new Dictionary<string, HashSet<int>>(StringComparer.OrdinalIgnoreCase);
+            return;
+        }
+
+        _manualTagIdsByPath = _tagAssignmentService?.GetEffectiveTagIdsByPath(items, _currentFolder?.Path)
+            ?? new Dictionary<string, HashSet<int>>(StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static bool TryGetItemPath(ExplorerItem item, out string normalizedPath)
+    {
+        switch (item)
+        {
+            case Folder folder:
+                normalizedPath = PathNormalizer.NormalizeAbsolutePath(folder.Path);
+                return true;
+
+            case File file when !string.IsNullOrWhiteSpace(file.FullPath):
+                normalizedPath = PathNormalizer.NormalizeAbsolutePath(file.FullPath);
+                return true;
+
+            default:
+                normalizedPath = string.Empty;
+                return false;
+        }
+    }
+
+    private static void RebuildRequiredTagIds(HashSet<int> target, IEnumerable<int> source)
+    {
+        target.Clear();
+
+        foreach (var tagId in source)
+        {
+            target.Add(tagId);
         }
     }
 

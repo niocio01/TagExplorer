@@ -1,12 +1,13 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using System.Collections.Generic;
+using Microsoft.Extensions.DependencyInjection;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Windows;
 using TagExplorer.Models;
+using TagExplorer.Services;
 using File = TagExplorer.Models.File;
 using Folder = TagExplorer.Models.Folder;
 
@@ -14,7 +15,7 @@ namespace TagExplorer.ViewModels;
 
 public partial class ItemDetails_VM : ObservableObject
 {
-    private readonly Dictionary<string, List<FilterTag>> _tagsByItemKey = new(StringComparer.OrdinalIgnoreCase);
+    private readonly TagAssignmentService? _tagAssignmentService;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(SelectedItemName))]
@@ -64,6 +65,16 @@ public partial class ItemDetails_VM : ObservableObject
 
     public string ItemLastModified => GetDateDisplay(isCreated: false);
 
+    public ItemDetails_VM()
+        : this(App.AppHost?.Services.GetService<TagAssignmentService>())
+    {
+    }
+
+    public ItemDetails_VM(TagAssignmentService? tagAssignmentService)
+    {
+        _tagAssignmentService = tagAssignmentService;
+    }
+
     [RelayCommand]
     private void CopyPath()
     {
@@ -102,101 +113,44 @@ public partial class ItemDetails_VM : ObservableObject
             return;
         }
 
-        var key = GetItemKey(SelectedItem);
-        if (string.IsNullOrWhiteSpace(key))
+        if (_tagAssignmentService?.RemoveManualTag(SelectedItem, tag) != true)
         {
             return;
         }
 
-        if (!_tagsByItemKey.TryGetValue(key, out var storedTags))
-        {
-            return;
-        }
-
-        var removedFromStore = storedTags.RemoveAll(existing =>
-            string.Equals(existing.Name, tag.Name, StringComparison.OrdinalIgnoreCase)) > 0;
-
-        if (!removedFromStore)
-        {
-            return;
-        }
-
-        for (var i = SelectedItemTags.Count - 1; i >= 0; i--)
-        {
-            if (string.Equals(SelectedItemTags[i].Name, tag.Name, StringComparison.OrdinalIgnoreCase))
-            {
-                SelectedItemTags.RemoveAt(i);
-            }
-        }
+        ReloadSelectedItemTags();
     }
 
     private bool AddTagToSelectedItem(FilterTag tag)
     {
-        var key = GetItemKey(SelectedItem);
-        if (string.IsNullOrWhiteSpace(key))
+        var added = _tagAssignmentService?.TryAssignManualTag(SelectedItem, tag) == true;
+        if (added)
         {
-            return false;
+            ReloadSelectedItemTags();
         }
 
-        if (!_tagsByItemKey.TryGetValue(key, out var storedTags))
-        {
-            storedTags = [];
-            _tagsByItemKey[key] = storedTags;
-        }
-
-        if (storedTags.Any(existing => string.Equals(existing.Name, tag.Name, StringComparison.OrdinalIgnoreCase)))
-        {
-            return false;
-        }
-
-        var tagCopy = new FilterTag
-        {
-            Name = tag.Name,
-            Description = tag.Description,
-            IconName = tag.IconName,
-            Color = tag.Color,
-            Aliases = tag.Aliases,
-            IsSystemTag = tag.IsSystemTag,
-            Parent = tag.Parent,
-            Children = tag.Children,
-            FilterType = FilterTypes.None
-        };
-
-        storedTags.Add(tagCopy);
-        SelectedItemTags.Add(tagCopy);
-        return true;
+        return added;
     }
 
     partial void OnSelectedItemChanged(ExplorerItem? value)
     {
+        ReloadSelectedItemTags();
+    }
+
+    private void ReloadSelectedItemTags()
+    {
         SelectedItemTags.Clear();
 
-        var key = GetItemKey(value);
-        if (string.IsNullOrWhiteSpace(key))
+        if (_tagAssignmentService is null)
         {
             return;
         }
 
-        if (!_tagsByItemKey.TryGetValue(key, out var storedTags))
-        {
-            return;
-        }
-
-        foreach (var tag in storedTags)
+        var tags = _tagAssignmentService.GetManualTagsForItem(SelectedItem);
+        foreach (var tag in tags)
         {
             SelectedItemTags.Add(tag);
         }
-    }
-
-    private static string? GetItemKey(ExplorerItem? item)
-    {
-        return item switch
-        {
-            null => null,
-            File file => file.FullPath,
-            Folder folder => folder.Path,
-            _ => null
-        };
     }
 
     private string GetDateDisplay(bool isCreated)
