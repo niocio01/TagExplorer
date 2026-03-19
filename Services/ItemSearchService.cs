@@ -42,7 +42,6 @@ public sealed class ItemSearchService
         {
             foreach (var item in EnumerateItems(rootFolder, includeSubdirectories, includeHiddenFiles, onProgress, cancellationToken))
             {
-                cancellationToken.ThrowIfCancellationRequested();
                 allItems.Add(item);
                 onItem(item);
             }

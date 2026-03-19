@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:local="clr-namespace:TagExplorer.Views"
              xmlns:c="clr-namespace:TagExplorer.Converters"
              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
              mc:Ignorable="d"
@@ -10,6 +11,7 @@
              d:DesignWidth="800">
     <UserControl.Resources>
         <c:ExplorerItemToCompactIndentConverter x:Key="CompactItemIndentConverter" />
+        <c:ExplorerItemToCompactTagsConverter x:Key="CompactTagsConverter" MaxVisible="3" />
     </UserControl.Resources>
 
     <ListBox Name="FileExplorer"
@@ -19,29 +21,60 @@
              d:ItemsSource="{d:SampleData ItemCount=5}">
         <ListBox.ItemContainerStyle>
             <Style TargetType="{x:Type ListBoxItem}" BasedOn="{StaticResource {x:Type ListBoxItem}}">
+                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
                 <EventSetter Event="MouseDoubleClick" Handler="ListBoxItem_MouseDoubleClick"/>
             </Style>
         </ListBox.ItemContainerStyle>
         <ListBox.ItemTemplate>
             <DataTemplate>
-                <StackPanel Orientation="Horizontal">
-                    <StackPanel.Margin>
+                <Grid>
+                    <Grid.Margin>
                         <MultiBinding Converter="{StaticResource CompactItemIndentConverter}">
                             <Binding />
                             <Binding Path="DataContext.CurrentFolderPath" RelativeSource="{RelativeSource AncestorType=UserControl}" />
                         </MultiBinding>
-                    </StackPanel.Margin>
+                    </Grid.Margin>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
                     <materialDesign:PackIcon
+                        Grid.Column="0"
                         Height="20"
                         Width="20"
                         Kind="{Binding Path=IconString}"
                         Padding="0"
-                        Margin="0 -3 10 0" />
+                        Margin="0 -3 10 0"
+                        ToolTip="Item icon" />
                     <TextBlock
+                        Grid.Column="1"
                         Text="{Binding Path=Name}"
                         d:Text="Item text that is fairly long.txt"
                         Style="{StaticResource MaterialDesignBody2TextBlock}" />
-                </StackPanel>
+
+                    <ItemsControl Grid.Column="2"
+                                  Margin="8 0 0 0"
+                                  VerticalAlignment="Center">
+                        <ItemsControl.ItemsSource>
+                            <MultiBinding Converter="{StaticResource CompactTagsConverter}">
+                                <Binding />
+                                <Binding Path="DataContext" RelativeSource="{RelativeSource AncestorType=UserControl}" />
+                            </MultiBinding>
+                        </ItemsControl.ItemsSource>
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <local:CompactTagToken_V />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Grid>
             </DataTemplate>
         </ListBox.ItemTemplate>
     </ListBox>

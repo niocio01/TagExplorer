@@ -51,6 +51,11 @@ public partial class TagsOverview_VM : ObservableValidator
     [ObservableProperty]
     private string? _iconName;
 
+    [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [StringLength(8)]
+    private string? _shortCode;
+
     [NotifyDataErrorInfo]
     [ObservableProperty]
     [Required]
@@ -168,6 +173,7 @@ public partial class TagsOverview_VM : ObservableValidator
         Name = SelectedTag?.Name;
         Description = SelectedTag?.Description;
         AliasString = SelectedTag?.Aliases == null ? "" : string.Join("\r\n", SelectedTag.Aliases);
+        ShortCode = SelectedTag?.ShortCode;
         IconName = DefaultIconString;
         Color = DefaultTagColor;
         ColorButtonVMs.First(vm => vm.Color == DefaultTagColor).SelectColor();
@@ -196,7 +202,7 @@ public partial class TagsOverview_VM : ObservableValidator
         if (NewTagEdit)
         {
             List<string>? aliases = AliasString?.Split("\r\n").ToList();
-            TagDTO newDTOTag = new(Name!, Color!, Description, aliases, IconName!);
+            TagDTO newDTOTag = new(Name!, Color!, Description, aliases, IconName!, shortCode: ShortCode);
             _db.Tags.Add(newDTOTag);
             _db.SaveChanges();
 
@@ -211,6 +217,7 @@ public partial class TagsOverview_VM : ObservableValidator
             SelectedTag.Description = Description;
             SelectedTag.Aliases = AliasString?.Split("\r\n").ToList();
             SelectedTag.IconName = IconName;
+            SelectedTag.ShortCode = ShortCode;
             SelectedTag.Color = Color;
             _db.SaveChanges();
             TagVMs.First(t => t.Tag == SelectedTag).UpdateProps();
@@ -235,6 +242,7 @@ public partial class TagsOverview_VM : ObservableValidator
         Name = null;
         Description = null;
         AliasString = null;
+        ShortCode = null;
         IconName = null;
         Color = null;
     }

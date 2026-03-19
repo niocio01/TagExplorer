@@ -47,6 +47,31 @@ public class TagAssignmentService
         return tags.Select(t => new FilterTag(t)).ToList();
     }
 
+    public IReadOnlyDictionary<int, CompactTagDefinition> GetCompactTagDefinitionsByIds(IEnumerable<int> tagIds)
+    {
+        var ids = tagIds.Distinct().ToList();
+        if (ids.Count == 0)
+        {
+            return new Dictionary<int, CompactTagDefinition>();
+        }
+
+        var tags = _db.Tags
+            .Include(t => t.Color)
+            .Where(t => ids.Contains(t.Id) && !t.IsArchived)
+            .ToList();
+
+        return tags.ToDictionary(
+            t => t.Id,
+            t => new CompactTagDefinition
+            {
+                Id = t.Id,
+                Name = t.Name,
+                ShortCode = t.ShortCode,
+                IconName = t.IconName,
+                ColorHex = t.Color?.HexCode
+            });
+    }
+
     public bool TryAssignManualTag(ExplorerItem? item, FilterTag tag, ApplyScope scope = ApplyScope.Self)
     {
         if (tag.Id is null)

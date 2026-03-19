@@ -61,6 +61,8 @@ public partial class FileList_VM : ObservableObject
     private readonly TagAssignmentService? _tagAssignmentService;
     private IReadOnlyDictionary<string, HashSet<int>> _manualTagIdsByPath =
         new Dictionary<string, HashSet<int>>(StringComparer.OrdinalIgnoreCase);
+    private IReadOnlyDictionary<int, CompactTagDefinition> _compactTagDefinitionsById =
+        new Dictionary<int, CompactTagDefinition>();
     private List<BaseFolder> _homeBaseFolders = [];
     private Folder? _currentFolder;
 
@@ -615,14 +617,97 @@ public partial class FileList_VM : ObservableObject
 
     private void RefreshTagFilterCache(IEnumerable<ExplorerItem> items)
     {
-        if (_requiredTagIdsCache.Count == 0 && _disallowedTagIdsCache.Count == 0)
+        if (_tagAssignmentService is null)
         {
             _manualTagIdsByPath = new Dictionary<string, HashSet<int>>(StringComparer.OrdinalIgnoreCase);
+            _compactTagDefinitionsById = new Dictionary<int, CompactTagDefinition>();
             return;
         }
 
-        _manualTagIdsByPath = _tagAssignmentService?.GetEffectiveTagIdsByPath(items, _currentFolder?.Path)
-            ?? new Dictionary<string, HashSet<int>>(StringComparer.OrdinalIgnoreCase);
+        _manualTagIdsByPath = _tagAssignmentService.GetEffectiveTagIdsByPath(items, _currentFolder?.Path);
+
+        var involvedTagIds = _manualTagIdsByPath.Values
+            .SelectMany(ids => ids)
+            .Distinct()
+            .ToList();
+
+        _compactTagDefinitionsById = _tagAssignmentService.GetCompactTagDefinitionsByIds(involvedTagIds);
+    }
+
+    public IReadOnlyList<CompactTagToken> GetCompactTagTokens(ExplorerItem? item, int maxVisible = 3)
+    {
+        if (item is null || maxVisible <= 0)
+        {
+            return [];
+        }
+
+        if (!TryGetItemPath(item, out var normalizedPath))
+        {
+            return [];
+        }
+
+        if (!_manualTagIdsByPath.TryGetValue(normalizedPath, out var tagIds) || tagIds.Count == 0)
+        {
+            return [];
+        }
+
+        var orderedDefinitions = tagIds
+            .Select(id => _compactTagDefinitionsById.TryGetValue(id, out var definition)
+                ? definition
+                : new CompactTagDefinition { Id = id, Name = id.ToString() })
+            .OrderBy(d => d.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var visible = orderedDefinitions
+            .Take(maxVisible)
+            .Select(definition => new CompactTagToken
+            {
+                Text = BuildCompactText(definition),
+                ColorHex = string.IsNullOrWhiteSpace(definition.ColorHex) ? "#FF9E9E9E" : definition.ColorHex,
+                Tooltip = definition.Name,
+                IsOverflow = false
+            })
+            .ToList();
+
+        var overflowCount = orderedDefinitions.Count - visible.Count;
+        if (overflowCount > 0)
+        {
+            visible.Add(new CompactTagToken
+            {
+                Text = $"+{overflowCount}",
+                ColorHex = null,
+                Tooltip = $"{overflowCount} more tags",
+                IsOverflow = true
+            });
+        }
+
+        return visible;
+    }
+
+    private static string BuildCompactText(CompactTagDefinition definition)
+    {
+        if (!string.IsNullOrWhiteSpace(definition.ShortCode))
+        {
+            return definition.ShortCode.Trim().ToUpperInvariant();
+        }
+
+        if (string.IsNullOrWhiteSpace(definition.Name))
+        {
+            return "?";
+        }
+
+        var letters = new string(definition.Name
+            .Where(char.IsLetterOrDigit)
+            .ToArray());
+
+        if (letters.Length == 0)
+        {
+            return "?";
+        }
+
+        return letters.Length == 1
+            ? letters[..1].ToUpperInvariant()
+            : letters[..2].ToUpperInvariant();
     }
 
     private static bool TryGetItemPath(ExplorerItem item, out string normalizedPath)

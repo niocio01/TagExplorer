@@ -147,6 +147,14 @@
                         VerticalScrollBarVisibility="Auto"
                     />
 
+                    <TextBox
+                        Margin="0 10 0 0"
+                        VerticalAlignment="Center"
+                        materialDesign:HintAssist.Hint="Short code (max 8)"
+                        Text="{Binding Path=ShortCode, UpdateSourceTrigger=PropertyChanged}"
+                        Style="{StaticResource MaterialDesignFloatingHintTextBox}"
+                        MaxLength="8" />
+
                     <Label
                         Content="Color"
                         Margin="0 10 0 0"/>

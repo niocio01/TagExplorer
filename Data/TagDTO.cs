@@ -34,6 +34,9 @@ public class TagDTO
     [Column(TypeName = "varchar(50)")]
     public string IconName { get; set; }
 
+    [Column(TypeName = "varchar(8)")]
+    public string? ShortCode { get; set; }
+
     public List<string>? Aliases { get; set; }
 
     public bool IsSystemTag { get; set; }
@@ -41,7 +44,7 @@ public class TagDTO
     // Parameterless constructor required by EF
     public TagDTO() { }
     
-    public TagDTO(string name, Color color, string? description, List<string>? aliases, string iconName, bool isSystemTag = false)
+    public TagDTO(string name, Color color, string? description, List<string>? aliases, string iconName, bool isSystemTag = false, string? shortCode = null)
     {
         Name = name;
         Color = color;
@@ -50,6 +53,7 @@ public class TagDTO
         Aliases = aliases;
         IconName = iconName;
         IsSystemTag = isSystemTag;
+        ShortCode = shortCode;
     }
 }
 

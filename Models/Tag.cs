@@ -16,6 +16,7 @@ public interface ITag
     Color? Color { get; set; }
     string? Description { get; set; }
     string? IconName { get; set; }
+    string? ShortCode { get; set; }
     ITag? Parent { get; set; }
     List<ITag>? Children { get; set; }
     List<string>? Aliases { get; set; }
@@ -53,6 +54,7 @@ public partial class AppliedTag : ObservableValidator, ITag
     private string? _description;
 
     [ObservableProperty] private string? _iconName;
+    [ObservableProperty] private string? _shortCode;
     [ObservableProperty] private ITag? _parent;
     [ObservableProperty] private List<ITag>? _children;
 
@@ -74,6 +76,7 @@ public partial class AppliedTag : ObservableValidator, ITag
         Color = dto.Color;
         Description = dto.Description;
         IconName = dto.IconName;
+        ShortCode = dto.ShortCode;
         Aliases = dto.Aliases;
         IsSystemTag = dto.IsSystemTag;
         IsVirtual = false;
@@ -102,6 +105,7 @@ public partial class FilterTag : Filter,  ITag
     public Color? Color { get; set; }
     public string? Description { get; set; }
     public string? IconName { get; set; }
+    public string? ShortCode { get; set; }
     public ITag? Parent { get; set; }
     public List<ITag>? Children { get; set; }
     public List<string>? Aliases { get; set; }
@@ -118,6 +122,7 @@ public partial class FilterTag : Filter,  ITag
         Color = tag.Color;
         Description = tag.Description;
         IconName = tag.IconName;
+        ShortCode = tag.ShortCode;
         Parent = null;
         Children = [];
         Aliases = tag.Aliases;
