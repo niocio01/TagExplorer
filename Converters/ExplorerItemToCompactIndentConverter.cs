@@ -2,8 +2,6 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Data;
 using TagExplorer.Models;
-using File = TagExplorer.Models.File;
-using Folder = TagExplorer.Models.Folder;
 
 namespace TagExplorer.Converters;
 
@@ -25,7 +23,7 @@ internal class ExplorerItemToCompactIndentConverter : IMultiValueConverter
             return DirectItemMargin;
         }
 
-        var itemPath = GetItemPath(item);
+        var itemPath = item.Path;
         if (string.IsNullOrWhiteSpace(itemPath))
         {
             return DirectItemMargin;
@@ -38,16 +36,6 @@ internal class ExplorerItemToCompactIndentConverter : IMultiValueConverter
     public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
     {
         throw new NotImplementedException();
-    }
-
-    private static string? GetItemPath(ExplorerItem item)
-    {
-        return item switch
-        {
-            Folder folder => folder.Path,
-            File file => file.FullPath,
-            _ => null
-        };
     }
 
     private static int GetDepth(string rootPath, string currentPath)

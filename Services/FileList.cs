@@ -14,8 +14,7 @@ public readonly record struct FileListFilterOptions(
     bool CurrentItemsExcludeHidden,
     IReadOnlySet<string> RequiredExtensions,
     IReadOnlySet<int> RequiredTagIds,
-    IReadOnlySet<int> DisallowedTagIds,
-    Func<ExplorerItem, bool>? MatchesTagFilter);
+    IReadOnlySet<int> DisallowedTagIds);
 
 public static class FileList
 {
@@ -105,8 +104,16 @@ public static class FileList
             }
         }
 
-        if (!options.ShowHiddenFiles && !options.CurrentItemsExcludeHidden && IsHiddenItem(item))
-            return false;
+        if (!options.ShowHiddenFiles)
+        {
+            if (item.IsHidden == null)
+            {
+                item.LoadAdditionalProperties();
+                if (item.IsHidden == false)
+                    return false;
+            }
+        }
+           
 
         if (!MatchesExtensionFilter(item, options.RequiredExtensions))
         {
@@ -118,7 +125,7 @@ public static class FileList
             return true;
         }
 
-        return options.MatchesTagFilter?.Invoke(item) == true;
+        return true;
     }
 
     private static int GetDepth(string rootPath, string currentPath)
@@ -166,30 +173,7 @@ public static class FileList
             }
         }
     }
-
-    private static bool IsHiddenItem(ExplorerItem item)
-    {
-        try
-        {
-            if (item is Folder folder)
-            {
-                var attributes = System.IO.File.GetAttributes(folder.Path);
-                return (attributes & FileAttributes.Hidden) == FileAttributes.Hidden;
-            }
-
-            if (item is File file && !string.IsNullOrWhiteSpace(file.FullPath))
-            {
-                var attributes = System.IO.File.GetAttributes(file.FullPath);
-                return (attributes & FileAttributes.Hidden) == FileAttributes.Hidden;
-            }
-        }
-        catch
-        {
-        }
-
-        return false;
-    }
-
+    
     private static bool MatchesExtensionFilter(ExplorerItem item, IReadOnlySet<string> requiredExtensions)
     {
         if (requiredExtensions.Count == 0)

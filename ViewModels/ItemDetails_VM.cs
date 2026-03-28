@@ -28,7 +28,7 @@ public partial class ItemDetails_VM : ObservableObject
     private ExplorerItem? _selectedItem;
 
     [ObservableProperty]
-    private ObservableCollection<FilterTag> _selectedItemTags = [];
+    private ObservableCollection<Tag> _selectedItemTags = [];
 
     public string SelectedItemName => SelectedItem?.Name ?? "No Item Selected";
 
@@ -93,8 +93,8 @@ public partial class ItemDetails_VM : ObservableObject
     {
         return dropData switch
         {
-            FilterTag filterTag => AddTagToSelectedItem(filterTag),
-            Tag_VM tagVm => AddTagToSelectedItem(new FilterTag(tagVm.Tag)),
+            Tag filterTag => AddTagToSelectedItem(filterTag),
+            Tag_VM tagVm => AddTagToSelectedItem(new Tag(tagVm.Tag)),
             _ => false
         };
     }
@@ -121,7 +121,7 @@ public partial class ItemDetails_VM : ObservableObject
         ReloadSelectedItemTags();
     }
 
-    private bool AddTagToSelectedItem(FilterTag tag)
+    private bool AddTagToSelectedItem(Tag tag)
     {
         var added = _tagAssignmentService?.TryAssignManualTag(SelectedItem, tag) == true;
         if (added)
@@ -139,6 +139,9 @@ public partial class ItemDetails_VM : ObservableObject
 
     private void ReloadSelectedItemTags()
     {
+        if(SelectedItem is null)
+            return;
+
         SelectedItemTags.Clear();
 
         if (_tagAssignmentService is null)
@@ -198,7 +201,7 @@ public partial class ItemDetails_VM : ObservableObject
 
     private static string FormatBytes(long bytes)
     {
-        string[] units = ["B", "KB", "MB", "GB", "TB"];
+        string[] units = ["B", "kB", "MB", "GB", "TB"];
         double size = bytes;
         var unit = 0;
 

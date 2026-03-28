@@ -5,10 +5,9 @@ using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Linq;
 using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 using TagExplorer.Data;
 using TagExplorer.Models;
 using TagExplorer.Services;
@@ -39,6 +38,7 @@ public partial class Explorer_VM : ObservableObject
     
     public bool GoBackAvailable => CurrentHistoryPosition >= 1;
     public bool GoForwardAvailable => CurrentHistoryPosition < BreadcrumbsHistory.Count-1;
+    public bool IsCacheBuilding => FileList.IsCacheBuilding;
 
     [ObservableProperty]
     private bool _doRecursiveSearch = true;
@@ -47,7 +47,7 @@ public partial class Explorer_VM : ObservableObject
     private bool _showFolders = true;
 
     [ObservableProperty]
-    private bool _showHiddenFiles = false;
+    private bool _showHiddenFiles = true;
 
     [ObservableProperty]
     private ObservableCollection<FilterTag> _allFilterTags;
@@ -78,10 +78,14 @@ public partial class Explorer_VM : ObservableObject
     {
         _db = App.AppHost?.Services.GetService<AppDbContext>();
         var tagAssignmentService = App.AppHost?.Services.GetService<TagAssignmentService>();
+        var itemSearchService = App.AppHost?.Services.GetService<ItemSearchService>();
+        var dataCachingService = App.AppHost?.Services.GetService<DataCachingService>();
+        var baseFolders = _db?.BaseFolders.AsNoTracking().ToList() ?? [];
 
-        FileList = new FileList_VM(tagAssignmentService);
+        FileList = new FileList_VM(tagAssignmentService, itemSearchService, dataCachingService);
         FileList.FolderDoubleClicked += FileListFolderDoubleClicked;
         FileList.SelectedItemChanged += FileListSelectedItemChanged;
+        FileList.PropertyChanged += FileListPropertyChanged;
         ItemDetails = new ItemDetails_VM(tagAssignmentService);
         _breadcrumbsHistory = new ObservableCollection<List<Folder>>();
 
@@ -104,14 +108,21 @@ public partial class Explorer_VM : ObservableObject
             extentionButton_VM.FilterTypeChanged += ExtentionFilterTypeChanged;
         }
 
-        ApplyFileListFilters(reloadCurrentFolder: false);
-        SetCurrentPathToHome();
+        SetCurrentPathToHome(baseFolders);
         AddToHistory(Breadcrumbs.ToList());
     }
 
     private void FileListSelectedItemChanged(object? sender, ExplorerItem? selectedItem)
     {
         ItemDetails.SelectedItem = selectedItem;
+    }
+
+    private void FileListPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(FileList_VM.IsCacheBuilding))
+        {
+            OnPropertyChanged(nameof(IsCacheBuilding));
+        }
     }
 
     private void TagFilterTypeChanged(object? sender, FilterTypes e)
@@ -167,7 +178,7 @@ public partial class Explorer_VM : ObservableObject
         }
         else
         {
-            Breadcrumbs.Add(new Folder(folder.Name, currentBreadcrumb));
+            Breadcrumbs.Add(new Folder(folder.Name, currentBreadcrumb, false));
         }
 
         Folder newCurrentFolder = Breadcrumbs[ Breadcrumbs.Count - 1 ];
@@ -177,20 +188,22 @@ public partial class Explorer_VM : ObservableObject
         AddToHistory(Breadcrumbs.ToList());
     }
 
-    private void SetCurrentPathToHome()
+    private void SetCurrentPathToHome(IReadOnlyList<BaseFolder>? baseFolders = null)
     {
         Breadcrumbs =
         [
-            new Folder("BaseFolders", "BaseFolders")
+            new Folder("BaseFolders", "BaseFolders", false)
         ];
 
-        if (_db == null)
+        var folders = baseFolders ?? _db?.BaseFolders.AsNoTracking().ToList() ?? [];
+
+        if (folders.Count == 0)
         {
             FileList.SetHomeItems([]);
             return;
         }
 
-        FileList.SetHomeItems(_db.BaseFolders);
+        FileList.SetHomeItems(folders);
     }
 
     private void SetCurrentFolderItems(Folder newCurrentFolder)

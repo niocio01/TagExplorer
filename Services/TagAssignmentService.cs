@@ -16,7 +16,7 @@ public class TagAssignmentService
         _db = db;
     }
 
-    public IReadOnlyList<FilterTag> GetManualTagsForItem(ExplorerItem? item)
+    public IReadOnlyList<Tag> GetManualTagsForItem(ExplorerItem item)
     {
         if (!TryGetAssignmentTarget(item, out var targetPath, out var targetType))
         {
@@ -44,7 +44,7 @@ public class TagAssignmentService
             .Where(t => manualTagIds.Contains(t.Id) && !t.IsArchived)
             .ToList();
 
-        return tags.Select(t => new FilterTag(t)).ToList();
+        return tags.Select(t => new Tag(t)).ToList();
     }
 
     public IReadOnlyDictionary<int, CompactTagDefinition> GetCompactTagDefinitionsByIds(IEnumerable<int> tagIds)
@@ -72,7 +72,7 @@ public class TagAssignmentService
             });
     }
 
-    public bool TryAssignManualTag(ExplorerItem? item, FilterTag tag, ApplyScope scope = ApplyScope.Self)
+    public bool TryAssignManualTag(ExplorerItem item, Tag tag, ApplyScope scope = ApplyScope.Self)
     {
         if (tag.Id is null)
         {
@@ -112,7 +112,6 @@ public class TagAssignmentService
             TargetType = targetType,
             TargetPath = targetPath,
             TagId = tagId,
-            AutoRuleParentTagId = null,
             MatchByAlias = true
         });
 
@@ -292,17 +291,16 @@ public class TagAssignmentService
         return true;
     }
 
-    private static bool TryGetAssignmentTarget(ExplorerItem? item, out string targetPath, out TargetType targetType)
+    private static bool TryGetAssignmentTarget(ExplorerItem item, out string targetPath, out TargetType targetType)
     {
+        targetPath = item.Path;
         switch (item)
-        {
-            case Folder folder:
-                targetPath = PathNormalizer.NormalizeAbsolutePath(folder.Path);
+        {            
+            case Folder:                
                 targetType = TargetType.Folder;
                 return true;
 
-            case File file when !string.IsNullOrWhiteSpace(file.FullPath):
-                targetPath = PathNormalizer.NormalizeAbsolutePath(file.FullPath);
+            case File:
                 targetType = TargetType.File;
                 return true;
 

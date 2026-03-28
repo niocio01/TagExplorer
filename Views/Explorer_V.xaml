@@ -397,6 +397,10 @@
                 Margin="0 4 10 4"
                 Orientation="Horizontal"
                 VerticalAlignment="Center">
+                <ProgressBar
+                    Margin="4 0 10 0"
+                    IsIndeterminate="{Binding IsCacheBuilding}"
+                    Style="{StaticResource MaterialDesignCircularProgressBar}"                      />
                 <materialDesign:PackIcon
                     Kind="FolderOutline"
                     Width="16"

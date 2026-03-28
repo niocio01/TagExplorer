@@ -2,9 +2,13 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using System;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows;
 using TagExplorer.Data;
+using TagExplorer.Models;
 using TagExplorer.Services;
 using TagExplorer.ViewModels;
 using TagExplorer.Views;
@@ -17,8 +21,17 @@ public partial class App : Application
     public static IHost? AppHost { get; private set; }
     public IServiceProvider ServiceProvider { get; private set; }
 
+#if DEBUG
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool AllocConsole();
+#endif
+
     public App()
     {
+#if DEBUG
+        EnsureDebugConsole();
+#endif
+
         AppHost = Host.CreateDefaultBuilder()
             .ConfigureAppConfiguration(hostConfig =>
             {
@@ -26,10 +39,22 @@ public partial class App : Application
                 hostConfig.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
                 hostConfig.AddEnvironmentVariables(prefix: "PREFIX_");
             })
+            .ConfigureLogging(logging =>
+            {
+                logging.SetMinimumLevel(LogLevel.Information);
+                logging.AddDebug();
+                logging.AddSimpleConsole(options =>
+                {
+                    options.SingleLine = true;
+                    options.TimestampFormat = "HH:mm:ss ";
+                });
+            })
             .ConfigureServices((hostContext, services) =>
             {
                 services.AddDbContext<AppDbContext>();
                 services.AddScoped<TagAssignmentService>();
+                services.AddSingleton<ItemSearchService>();
+                services.AddSingleton<DataCachingService>();
 
                 services.AddScoped<ViewModels.MainWindow_VM>();
                 services.AddSingleton<MainWindow>(s => new MainWindow
@@ -43,6 +68,13 @@ public partial class App : Application
 
         ServiceProvider = AppHost.Services;
     }
+
+#if DEBUG
+    private static void EnsureDebugConsole()
+    {
+        _ = AllocConsole();
+    }
+#endif
 
     protected override async void OnStartup(StartupEventArgs e)
     {
@@ -64,7 +96,36 @@ public partial class App : Application
         MainWindow = ServiceProvider.GetRequiredService<MainWindow>();
         MainWindow.Show();
 
+        _ = WarmupItemCacheAsync();
+
         base.OnStartup(e);
+    }
+
+    private async Task WarmupItemCacheAsync()
+    {
+        try
+        {
+            using var scope = ServiceProvider.CreateScope();
+            var scopedProvider = scope.ServiceProvider;
+
+            var db = scopedProvider.GetRequiredService<AppDbContext>();
+            var itemSearchService = scopedProvider.GetRequiredService<ItemSearchService>();
+
+            var baseFolders = await db.BaseFolders
+                .AsNoTracking()
+                .ToListAsync();
+
+            var tagAssignments = await db.TagAssignments
+                .AsNoTracking()
+                .Where(a => a.Enabled && !a.IsArchived && a.Kind == AssignmentKind.Manual && a.TagId.HasValue)
+                .ToListAsync();
+
+            await itemSearchService.BuildCacheAndIndexesAsync(baseFolders, tagAssignments);
+
+        }
+        catch
+        {
+        }
     }
 
     private async Task<bool> EnsureDatabaseReadyAsync(AppDbContext db, IConfiguration config)

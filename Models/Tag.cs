@@ -7,23 +7,17 @@ namespace TagExplorer.Models;
 
 public interface ITag
 {
-    int? Id { get; set; }
-    DateTime CreatedAtUtc { get; set; }
-    DateTime UpdatedAtUtc { get; set; }
-    string? CreatedBy { get; set; }
-    bool IsArchived { get; set; }
-    string? Name { get; set; }
-    Color? Color { get; set; }
-    string? Description { get; set; }
-    string? IconName { get; set; }
-    string? ShortCode { get; set; }
-    ITag? Parent { get; set; }
-    List<ITag>? Children { get; set; }
-    List<string>? Aliases { get; set; }
-    bool IsSystemTag { get; set; }
+    int? Id { get; }
+    string? Name { get; }
+    Color? Color { get; }
+    string? Description { get; }
+    string? IconName { get; }
+    string? ShortCode { get; }
+    List<string>? Aliases { get; }
+    bool IsSystemTag { get; }
 }
 
-public partial class AppliedTag : ObservableValidator, ITag
+public partial class Tag : ObservableValidator, ITag
 {
     [ObservableProperty]
     private int? _id;
@@ -60,10 +54,8 @@ public partial class AppliedTag : ObservableValidator, ITag
 
     [ObservableProperty] private List<string>? _aliases;
     [ObservableProperty] private bool _isSystemTag = false;
-    [ObservableProperty] private bool _isVirtual;
-    [ObservableProperty] private TagAssignment? _virtualSourceAssignment;
 
-    public AppliedTag(TagDTO dto)
+    public Tag(TagDTO dto)
     {
         Id = dto.Id;
         CreatedAtUtc = dto.CreatedAtUtc;
@@ -79,12 +71,6 @@ public partial class AppliedTag : ObservableValidator, ITag
         ShortCode = dto.ShortCode;
         Aliases = dto.Aliases;
         IsSystemTag = dto.IsSystemTag;
-        IsVirtual = false;
-        VirtualSourceAssignment = null;
-    }
-
-    public AppliedTag()
-    {
     }
 
     public bool IsValid()
@@ -97,39 +83,23 @@ public partial class AppliedTag : ObservableValidator, ITag
 public partial class FilterTag : Filter,  ITag
 {
     public int? Id { get; set; }
-    public DateTime CreatedAtUtc { get; set; }
-    public DateTime UpdatedAtUtc { get; set; }
-    public string? CreatedBy { get; set; }
-    public bool IsArchived { get; set; }
     public string? Name { get; set; }
     public Color? Color { get; set; }
     public string? Description { get; set; }
     public string? IconName { get; set; }
     public string? ShortCode { get; set; }
-    public ITag? Parent { get; set; }
-    public List<ITag>? Children { get; set; }
     public List<string>? Aliases { get; set; }
     public bool IsSystemTag { get; set; } = false;
 
     public FilterTag(TagDTO tag)
     {
         Id = tag.Id;
-        CreatedAtUtc = tag.CreatedAtUtc;
-        UpdatedAtUtc = tag.UpdatedAtUtc;
-        CreatedBy = tag.CreatedBy;
-        IsArchived = tag.IsArchived;
         Name = tag.Name;
         Color = tag.Color;
         Description = tag.Description;
         IconName = tag.IconName;
         ShortCode = tag.ShortCode;
-        Parent = null;
-        Children = [];
         Aliases = tag.Aliases;
         IsSystemTag = tag.IsSystemTag;
-    }
-
-    public FilterTag()
-    {
     }
 }

@@ -1,8 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Xml.Linq;
+using TagExplorer.Services;
 
 namespace TagExplorer.Models;
 
@@ -89,12 +92,28 @@ public static class FileTypes
 
 public abstract class ExplorerItem
 {
+    /// <summary>
+    /// Name of the file or folder, without path. For files, this does not include the extension.
+    /// </summary>
     public string Name { get; init; }
+
+    /// <summary>
+    /// Material symbol string for the icon to display for this item.
+    /// </summary>
     public string IconString { get; init; }
 
-    public string Path { get; }
+    /// <summary>
+    /// normalized Path to the full item on the File system.
+    /// For files this inludes the name and extention.
+    /// </summary>
+    public abstract string Path { get; }
+
     // If null, this item is a root folder
     public Folder? ParentFolder { get; init; }
+
+    public bool? IsHidden { get; protected set; }
+
+    public abstract void LoadAdditionalProperties();
 }
 
 public class Folder : ExplorerItem
@@ -102,28 +121,95 @@ public class Folder : ExplorerItem
     // If null, this item not a root folder
     private string? _path;
 
+    public DateTime? Modified { get; private set; }
+    public DateTime? Created { get; private set; }
+
     public bool HasParentFolder => ParentFolder != null;
 
     public List<ExplorerItem> Children { get; init; } = new List<ExplorerItem>();
 
     // root folder
-    public Folder(string rootPath, string name)
+    public Folder(string rootPath, string name, DateTime modified, DateTime created, bool isHidden)
     {
         _path = rootPath;
         Name = name;
         IconString = "FolderOutline";
         ParentFolder = null;
+        Modified = modified;
+        Created = created;
+        IsHidden = isHidden;
+    }
+
+    // root folder
+    public Folder(string rootPath, string name, bool loadAdditionalProps = false)
+    {
+        _path = rootPath;
+        Name = name;
+        IconString = "FolderOutline";
+        ParentFolder = null;
+
+        DateTime? modified = null;
+        DateTime? created = null;
+        bool? isHidden = null;
+
+        if (loadAdditionalProps && !string.IsNullOrWhiteSpace(rootPath))
+        {
+            try
+            {
+                var directoryInfo = new System.IO.DirectoryInfo(rootPath);
+                modified = directoryInfo.LastWriteTime;
+                created = directoryInfo.CreationTime;
+                isHidden = (directoryInfo.Attributes & System.IO.FileAttributes.Hidden) != 0;
+            }
+            catch
+            {
+            }
+        }
+
+        Modified = modified;
+        Created = created;
+        IsHidden = isHidden;
     }
 
     // sub folder
-    public Folder(string name, Folder? parentFolder)
+    public Folder(string name, Folder? parentFolder, DateTime modified, DateTime created, bool isHidden)
     {
         Name = name;
         IconString = "FolderOutline";
         ParentFolder = parentFolder;
+        Modified = modified;
+        Created = created;
+        IsHidden = isHidden;
     }
 
-    public string Path
+    // sub folder
+    public Folder(string name, Folder? parentFolder, bool loadAdditionalProps = false)
+    {
+        Name = name;
+        IconString = "FolderOutline";
+        ParentFolder = parentFolder;
+
+        DateTime? modified = null;
+        DateTime? created = null;
+        bool? isHidden = null;
+
+        if (loadAdditionalProps && ParentFolder != null)
+        {
+            try
+            {
+                LoadAdditionalProperties();
+            }
+            catch
+            {
+            }
+        }
+
+        Modified = modified;
+        Created = created;
+        IsHidden = isHidden;
+    }
+
+    public override string Path
     {
         get
         {
@@ -132,28 +218,120 @@ public class Folder : ExplorerItem
             {
                 return ParentFolder!.Path + System.IO.Path.DirectorySeparatorChar + Name;
             }
+
             // root folder
-            else
-            {
-                return _path;
-            }
+            return _path;
         }
+    }
+
+    public override void LoadAdditionalProperties()
+    {
+        var directoryInfo = new System.IO.DirectoryInfo(Path);
+        Modified = directoryInfo.LastWriteTime;
+        Created = directoryInfo.CreationTime;
+        IsHidden = (directoryInfo.Attributes & System.IO.FileAttributes.Hidden) != 0;
     }
 }
 
+
 public class File : ExplorerItem
 {
-    public string Extension { get; }
-    public string? FullPath { get; }
+    public string Extension { get; private set; }
 
-    public File(string name, string fileExtension, string? fullPath = null)
+    public override string Path => FullPath;
+
+    /// <summary>
+    /// Full directory path of file with the file name and extention.
+    /// </summary>
+    public string FullPath { get; private set; }
+
+    /// <summary>
+    /// Full directory path of file without the file name or extention.
+    /// </summary>
+    public string JustPath => System.IO.Path.GetDirectoryName(FullPath) ?? string.Empty;
+
+    /// <summary>
+    /// Size of the item, in bytes.
+    /// </summary>
+    public long? Size { get; private set; }
+    public DateTime? Modified { get; private set; }
+    public DateTime? Created { get; private set; }
+
+    public List<TagApplication> Tags { get; private set; }
+
+    public File(
+        string name,
+        Folder? parentFolder,
+        string fileExtension,
+        string fullPath,
+        long size,
+        DateTime modified,
+        DateTime created,
+        bool isHidden)
     {
         Name = name;
+        ParentFolder = parentFolder;
         Extension = fileExtension.TrimStart('.').ToLowerInvariant();
-        FullPath = fullPath;
+        FullPath = PathNormalizer.NormalizeAbsolutePath(fullPath);
+
+        Size = size;
+        Modified = modified;
+        Created = created;
+        IsHidden = isHidden;
 
         IconString = FileTypes.ByExtension.TryGetValue(Extension, out var type)
             ? type.IconString
             : "help";
+    }
+
+    public File(
+        string name,
+        Folder? parentFolder,
+        string fileExtension,
+        string fullPath,
+        bool loadAdditionalProps = false)
+    {
+        Name = name;
+        ParentFolder = parentFolder;
+        Extension = fileExtension.TrimStart('.').ToLowerInvariant();
+        FullPath = PathNormalizer.NormalizeAbsolutePath(fullPath);
+
+        Size = null;
+        Modified = null;
+        Created = null;
+        IsHidden = null;
+
+        if (loadAdditionalProps && !string.IsNullOrWhiteSpace(FullPath))
+        {
+            try
+            {
+                LoadAdditionalProperties();
+            }
+            catch
+            {
+            }
+        }
+
+        IconString = FileTypes.ByExtension.TryGetValue(Extension, out var type)
+            ? type.IconString
+            : "help";
+    }
+
+    public override void LoadAdditionalProperties()
+    {
+        var attributes = System.IO.File.GetAttributes(Path);
+        IsHidden = (attributes & FileAttributes.Hidden) == FileAttributes.Hidden;
+        Created = System.IO.File.GetCreationTime(Path);
+        Modified = System.IO.File.GetLastWriteTime(Path);
+    }
+
+    public void ApplyTag(TagApplication tagApplication)
+    {
+        Tags.Add(tagApplication);
+    }
+
+    public void RemoveTag(TagApplication tagApplication)
+    {
+        Tags.Remove(tagApplication);
     }
 }

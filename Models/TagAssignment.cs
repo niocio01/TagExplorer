@@ -49,26 +49,38 @@ public sealed class TagAssignment
 
     public int? TagId { get; set; }
 
-    public int? AutoRuleParentTagId { get; set; }
-
     public bool MatchByAlias { get; set; } = true;
 
     public bool Enabled { get; set; } = true;
+}
+/// <summary>
+/// A Tag Application describes a specific usage of a tag on an Explorer Item. It is used to hold references to all involved objects for quick lookup.
+/// </summary>
+public class TagApplication
+{
+    public ExplorerItem ExplorerItem { get; init; }
+    public Tag Tag { get; init; }
+    public TagAssignment Assignment { get; init; }
 
-    public bool IsValid()
+    private bool? _isVirtual = null;
+    public bool IsVirtual
     {
-        return Kind switch
+        get
         {
-            AssignmentKind.Manual =>
-                TagId.HasValue &&
-                AutoRuleParentTagId is null,
+            if (_isVirtual is null)
+            {
+                if (ExplorerItem.Path == Assignment.TargetPath)
+                    _isVirtual = false;
+                _isVirtual = true;
+            }
+            return _isVirtual.Value;
+        }
+    }
 
-            AssignmentKind.AutoDirectChildrenAsChildTag =>
-                TargetType == TargetType.Folder &&
-                TagId is null &&
-                AutoRuleParentTagId.HasValue,
-
-            _ => false
-        };
+    public TagApplication(ExplorerItem explorerItem, Tag tag, TagAssignment assignment)
+    {
+        ExplorerItem = explorerItem;
+        Tag = tag;
+        Assignment = assignment;
     }
 }
