@@ -399,7 +399,10 @@
                 VerticalAlignment="Center">
                 <ProgressBar
                     Margin="4 0 10 0"
-                    IsIndeterminate="{Binding IsCacheBuilding}"
+                    Visibility="{Binding FileList.IsCacheBuilding, Converter={StaticResource BooleanToVisibility}}"                  
+                    d:Visibility="Visible"
+                    Value="{Binding FileList.EstimatedSearchProgress}"
+                    d:Value="50"
                     Style="{StaticResource MaterialDesignCircularProgressBar}"                      />
                 <materialDesign:PackIcon
                     Kind="FolderOutline"

@@ -209,7 +209,7 @@ public partial class FileList_VM : ObservableObject
         ScannedFileCount = progress.ScannedFileCount;
         ScannedDepth = progress.ScannedDepth;
         IsCacheBuilding = !progress.IsCompleted;
-        EstimatedSearchProgress = progress.IsCompleted ? 100 : 0;
+        EstimatedSearchProgress = progress.PercentageCompleted;
     }
 
     private void OnFilteredFolderItemsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)

@@ -12,6 +12,7 @@ using Folder = TagExplorer.Models.Folder;
 namespace TagExplorer.Services;
 
 public readonly record struct ItemCacheBuildProgress(
+    float PercentageCompleted,
     int ScannedFolderCount,
     int ScannedFileCount,
     int ScannedDepth,
@@ -22,7 +23,7 @@ public class ItemSearchService
     private readonly DataCachingService _dataCachingService;
     private readonly ILogger<ItemSearchService>? _logger;
     private IReadOnlyList<ExplorerItem> _cachedItems = Array.Empty<ExplorerItem>();
-    private ItemCacheBuildProgress _lastCacheBuildProgress = new(0, 0, 0, true);
+    private ItemCacheBuildProgress _lastCacheBuildProgress = new(0, 0, 0, 0, true);
 
     public ItemCacheBuildProgress LastCacheBuildProgress => _lastCacheBuildProgress;
     public event Action<ItemCacheBuildProgress>? CacheBuildProgressChanged;
@@ -40,7 +41,8 @@ public class ItemSearchService
         CancellationToken cancellationToken = default)
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-        ReportCacheBuildProgress(new ItemCacheBuildProgress(0, 0, 0, false));
+        ReportCacheBuildProgress(new ItemCacheBuildProgress(0, 0, 0, 0, false));
+        int totalItemsToScan = baseFolders.Sum(f => f.FileCount + f.DirectoryCount);
 
         _logger?.LogInformation(
             "Cache build started. RequestedBaseFolders={RequestedBaseFolders}, MaxDegreeOfParallelism={MaxDegreeOfParallelism}",
@@ -124,6 +126,7 @@ public class ItemSearchService
                 if (processedCount == 1 || processedCount % 200 == 0)
                 {
                     ReportCacheBuildProgress(new ItemCacheBuildProgress(
+                        processedCount * 100 / totalItemsToScan,
                         scannedFolderCount,
                         scannedFileCount,
                         scannedDepth,
@@ -201,6 +204,7 @@ public class ItemSearchService
         _dataCachingService.BuildTagIndex();
 
         ReportCacheBuildProgress(new ItemCacheBuildProgress(
+            100,
             scannedFolderCount,
             scannedFileCount,
             scannedDepth,
@@ -334,7 +338,7 @@ public class ItemSearchService
     {
         _cachedItems = Array.Empty<ExplorerItem>();
         _dataCachingService.Clear();
-        ReportCacheBuildProgress(new ItemCacheBuildProgress(0, 0, 0, true));
+        ReportCacheBuildProgress(new ItemCacheBuildProgress(0, 0, 0, 0, true));
     }
 
     private void ReportCacheBuildProgress(in ItemCacheBuildProgress progress)
