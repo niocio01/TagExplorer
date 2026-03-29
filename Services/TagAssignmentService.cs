@@ -10,10 +10,12 @@ namespace TagExplorer.Services;
 public class TagAssignmentService
 {
     private readonly AppDbContext _db;
+    private readonly DataCachingService _dcs;
 
-    public TagAssignmentService(AppDbContext db)
+    public TagAssignmentService(AppDbContext db, DataCachingService dcs)
     {
         _db = db;
+        _dcs = dcs;
     }
 
     public IReadOnlyList<Tag> GetManualTagsForItem(ExplorerItem item)
@@ -22,54 +24,14 @@ public class TagAssignmentService
         {
             return [];
         }
+        var tags = _dcs.GetTagApplicationsForPath(targetPath);
 
-        var manualTagIds = _db.TagAssignments
-            .Where(a => a.Enabled
-                        && !a.IsArchived
-                        && a.Kind == AssignmentKind.Manual
-                        && a.TargetType == targetType
-                        && a.TargetPath == targetPath
-                        && a.TagId.HasValue)
-            .Select(a => a.TagId!.Value)
-            .Distinct()
-            .ToList();
-
-        if (manualTagIds.Count == 0)
+        if (tags.Count == 0)
         {
             return [];
-        }
+        }        
 
-        var tags = _db.Tags
-            .Include(t => t.Color)
-            .Where(t => manualTagIds.Contains(t.Id) && !t.IsArchived)
-            .ToList();
-
-        return tags.Select(t => new Tag(t)).ToList();
-    }
-
-    public IReadOnlyDictionary<int, CompactTagDefinition> GetCompactTagDefinitionsByIds(IEnumerable<int> tagIds)
-    {
-        var ids = tagIds.Distinct().ToList();
-        if (ids.Count == 0)
-        {
-            return new Dictionary<int, CompactTagDefinition>();
-        }
-
-        var tags = _db.Tags
-            .Include(t => t.Color)
-            .Where(t => ids.Contains(t.Id) && !t.IsArchived)
-            .ToList();
-
-        return tags.ToDictionary(
-            t => t.Id,
-            t => new CompactTagDefinition
-            {
-                Id = t.Id,
-                Name = t.Name,
-                ShortCode = t.ShortCode,
-                IconName = t.IconName,
-                ColorHex = t.Color?.HexCode
-            });
+        return tags.Select(t => t.Tag).ToList();
     }
 
     public bool TryAssignManualTag(ExplorerItem item, Tag tag, ApplyScope scope = ApplyScope.Self)
@@ -117,95 +79,6 @@ public class TagAssignmentService
 
         _db.SaveChanges();
         return true;
-    }
-
-    public IReadOnlyDictionary<string, HashSet<int>> GetEffectiveTagIdsByPath(IEnumerable<ExplorerItem> items, string? currentRootPath = null)
-    {
-        var itemInfos = new List<(string Path, TargetType Type)>();
-        var itemPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var item in items)
-        {
-            if (TryGetAssignmentTarget(item, out var targetPath, out var targetType))
-            {
-                itemInfos.Add((targetPath, targetType));
-                itemPaths.Add(targetPath);
-            }
-        }
-
-        if (itemInfos.Count == 0)
-        {
-            return new Dictionary<string, HashSet<int>>(StringComparer.OrdinalIgnoreCase);
-        }
-
-        var normalizedRootPath = string.IsNullOrWhiteSpace(currentRootPath)
-            ? null
-            : PathNormalizer.NormalizeAbsolutePath(currentRootPath);
-
-        var pathSeparator = Path.DirectorySeparatorChar.ToString();
-
-        var directAssignments = _db.TagAssignments
-            .Where(a => a.Enabled
-                        && !a.IsArchived
-                        && a.Kind == AssignmentKind.Manual
-                        && a.TagId.HasValue
-                        && itemPaths.Contains(a.TargetPath))
-            .Select(a => new { a.TargetPath, a.TargetType, a.Scope, TagId = a.TagId!.Value })
-            .ToList();
-
-        var inheritedFolderAssignments = _db.TagAssignments
-            .Where(a => a.Enabled
-                        && !a.IsArchived
-                        && a.Kind == AssignmentKind.Manual
-                        && a.TargetType == TargetType.Folder
-                        && a.TagId.HasValue
-                        && a.Scope != ApplyScope.Self)
-            .Where(a => normalizedRootPath == null
-                || a.TargetPath == normalizedRootPath
-                || a.TargetPath.StartsWith(normalizedRootPath + pathSeparator)
-                || normalizedRootPath.StartsWith(a.TargetPath + pathSeparator))
-            .Select(a => new { a.TargetPath, a.Scope, TagId = a.TagId!.Value })
-            .ToList();
-
-        var result = new Dictionary<string, HashSet<int>>(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var assignment in directAssignments)
-        {
-            foreach (var item in itemInfos)
-            {
-                if (!string.Equals(item.Path, assignment.TargetPath, StringComparison.OrdinalIgnoreCase)
-                    || item.Type != assignment.TargetType)
-                {
-                    continue;
-                }
-
-                AddTagId(result, item.Path, assignment.TagId);
-            }
-        }
-
-        foreach (var assignment in inheritedFolderAssignments)
-        {
-            foreach (var item in itemInfos)
-            {
-                if (!IsDescendantOrSelf(item.Path, assignment.TargetPath))
-                {
-                    continue;
-                }
-
-                if (assignment.Scope == ApplyScope.SelfAndDirectDescendants)
-                {
-                    var relativeDepth = GetRelativeDepth(assignment.TargetPath, item.Path);
-                    if (relativeDepth > 1)
-                    {
-                        continue;
-                    }
-                }
-
-                AddTagId(result, item.Path, assignment.TagId);
-            }
-        }
-
-        return result;
     }
 
     private static void AddTagId(IDictionary<string, HashSet<int>> map, string path, int tagId)

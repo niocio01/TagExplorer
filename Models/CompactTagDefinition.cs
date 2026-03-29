@@ -7,4 +7,5 @@ public sealed class CompactTagDefinition
     public string? ShortCode { get; init; }
     public string? IconName { get; init; }
     public string? ColorHex { get; init; }
+    public bool IsVirtual { get; init; }
 }

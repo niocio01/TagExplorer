@@ -28,12 +28,22 @@ public class DataCachingService
     private readonly Dictionary<string, HashSet<TagApplication>> _tagApplicationsByPath = [];
     private readonly Dictionary<int, HashSet<TagApplication>> _tagApplicationsByTagId = [];
 
+    public IReadOnlyList<ExplorerItem> ItemCache => _itemCache;
+    public List<Tag> TagCache => _tagCache;
+
     public DataCachingService(AppDbContext appDbContext, ILogger<ItemSearchService>? logger = null)
     {
         _db = appDbContext;
         _logger = logger;
 
-        _tagCache.AddRange(_db.Tags.AsNoTracking().Select(dto => new Tag(dto)));
+        var cachedTagDtos = _db.Tags
+            .AsNoTracking()
+            .Include(dto => dto.Color)
+            .Include(dto => dto.Parent)
+                .ThenInclude(parent => parent.Color)
+            .ToList();
+
+        _tagCache.AddRange(cachedTagDtos.Select(dto => new Tag(dto)));
         _tagAssignmentCache.AddRange(_db.TagAssignments.AsNoTracking().ToList());
     }
 

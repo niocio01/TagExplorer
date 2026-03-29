@@ -63,7 +63,7 @@ public partial class Tag : ObservableValidator, ITag
         CreatedBy = dto.CreatedBy;
         IsArchived = dto.IsArchived;
         Name = dto.Name;
-        Parent = null;
+        Parent = dto.Parent is null ? null : new FilterTag(dto.Parent);
         Children = [];
         Color = dto.Color;
         Description = dto.Description;
