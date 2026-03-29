@@ -61,6 +61,7 @@
                             <MultiBinding Converter="{StaticResource CompactTagsConverter}">
                                 <Binding />
                                 <Binding Path="DataContext" RelativeSource="{RelativeSource AncestorType=UserControl}" />
+                                <Binding Path="DataContext.CompactTagsVersion" RelativeSource="{RelativeSource AncestorType=UserControl}" />
                             </MultiBinding>
                         </ItemsControl.ItemsSource>
                         <ItemsControl.ItemsPanel>

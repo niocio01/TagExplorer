@@ -6,3 +6,4 @@
 - User prefers a compact file-list hierarchy indication with a single indentation level for items that are in subfolders, without distinguishing multiple depth levels.
 - Whenever icons are used in the UI, without a label, include a tooltip for clarity.
 - Virtual tags should represent purely inherited tags from ancestor folders, not only missing project-name tags.
+- Use CommunityToolkit.Mvvm Messenger for cross-class refresh notifications (e.g., tag update propagation).

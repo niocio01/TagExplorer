@@ -1,8 +1,10 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using CommunityToolkit.Mvvm.Messaging;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System.IO;
 using TagExplorer.Data;
 using TagExplorer.Models;
+using TagExplorer.Models.Messages;
 using File = TagExplorer.Models.File;
 
 namespace TagExplorer.Services;
@@ -136,6 +138,8 @@ public class DataCachingService
                     break;
             }
         }
+
+        WeakReferenceMessenger.Default.Send(new TagApplicationsChangedMessage());
     }
 
     private void CacheAndIndexApplication(TagApplication application)
@@ -273,6 +277,8 @@ public class DataCachingService
 
         CacheAndIndexApplication(application);
 
+        WeakReferenceMessenger.Default.Send(new TagApplicationsChangedMessage(application.ExplorerItem.Path));
+
         return true;
     }
 
@@ -296,6 +302,8 @@ public class DataCachingService
             dbAssigment.UpdatedAtUtc = DateTime.UtcNow;
             _db.SaveChanges();
         }
+
+        WeakReferenceMessenger.Default.Send(new TagApplicationsChangedMessage(application.ExplorerItem.Path));
 
         return true;
     }

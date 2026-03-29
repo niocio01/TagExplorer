@@ -1,10 +1,12 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Messaging;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.IO;
 using System.Windows;
 using TagExplorer.Data;
 using TagExplorer.Models;
+using TagExplorer.Models.Messages;
 using TagExplorer.Services;
 using File = TagExplorer.Models.File;
 using Folder = TagExplorer.Models.Folder;
@@ -50,6 +52,9 @@ public partial class FileList_VM : ObservableObject
 
     [ObservableProperty]
     private double _estimatedSearchProgress;
+
+    [ObservableProperty]
+    private int _compactTagsVersion;
 
     private bool _currentItemsExcludeHidden;
     private bool _doRecursiveSearch = true;
@@ -99,11 +104,29 @@ public partial class FileList_VM : ObservableObject
         FilteredFolderItems = new ObservableCollection<ExplorerItem>();
         FilteredFolderItems.CollectionChanged += OnFilteredFolderItemsCollectionChanged;
 
+        WeakReferenceMessenger.Default.Register<TagApplicationsChangedMessage>(this, static (recipient, _) =>
+        {
+            ((FileList_VM)recipient).RefreshCompactTags();
+        });
+
         if (_itemSearchService is not null)
         {
             ApplyCacheBuildProgress(_itemSearchService.LastCacheBuildProgress);
             _itemSearchService.CacheBuildProgressChanged += OnCacheBuildProgressChanged;
         }
+    }
+
+    public void RefreshCompactTags()
+    {
+        var dispatcher = Application.Current?.Dispatcher;
+
+        if (dispatcher is not null && !dispatcher.CheckAccess())
+        {
+            _ = dispatcher.InvokeAsync(RefreshCompactTags);
+            return;
+        }
+
+        CompactTagsVersion++;
     }
 
     public void UpdateFilters(
