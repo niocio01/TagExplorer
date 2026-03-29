@@ -16,6 +16,7 @@ namespace TagExplorer.ViewModels;
 public partial class ItemDetails_VM : ObservableObject
 {
     private readonly TagAssignmentService? _tagAssignmentService;
+    private readonly DataCachingService? _dcs;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(SelectedItemName))]
@@ -28,7 +29,7 @@ public partial class ItemDetails_VM : ObservableObject
     private ExplorerItem? _selectedItem;
 
     [ObservableProperty]
-    private ObservableCollection<Tag> _selectedItemTags = [];
+    private ObservableCollection<AppliedTag> _selectedItemTags = [];
 
     public string SelectedItemName => SelectedItem?.Name ?? "No Item Selected";
 
@@ -66,13 +67,16 @@ public partial class ItemDetails_VM : ObservableObject
     public string ItemLastModified => GetDateDisplay(isCreated: false);
 
     public ItemDetails_VM()
-        : this(App.AppHost?.Services.GetService<TagAssignmentService>())
+        : this(
+              App.AppHost?.Services.GetService<TagAssignmentService>(),
+              App.AppHost?.Services.GetService<DataCachingService>())
     {
     }
 
-    public ItemDetails_VM(TagAssignmentService? tagAssignmentService)
+    public ItemDetails_VM(TagAssignmentService? tagAssignmentService, DataCachingService dataCachingService)
     {
         _tagAssignmentService = tagAssignmentService;
+        _dcs = dataCachingService;
     }
 
     [RelayCommand]
@@ -93,7 +97,8 @@ public partial class ItemDetails_VM : ObservableObject
     {
         return dropData switch
         {
-            Tag filterTag => AddTagToSelectedItem(filterTag),
+            FilterTag filterTag => AddTagToSelectedItem(filterTag.Tag),
+            Tag Tag => AddTagToSelectedItem(Tag),
             Tag_VM tagVm => AddTagToSelectedItem(new Tag(tagVm.Tag)),
             _ => false
         };
@@ -108,12 +113,12 @@ public partial class ItemDetails_VM : ObservableObject
     [RelayCommand]
     private void HandleRemoveTag(object? tagData)
     {
-        if (tagData is not FilterTag tag)
+        if (tagData is not AppliedTag appliedTag)
         {
             return;
         }
 
-        if (_tagAssignmentService?.RemoveManualTag(SelectedItem, tag) != true)
+        if (_tagAssignmentService?.RemoveManualTagAssignment(appliedTag.Application.Assignment) != true)
         {
             return;
         }
@@ -123,7 +128,7 @@ public partial class ItemDetails_VM : ObservableObject
 
     private bool AddTagToSelectedItem(Tag tag)
     {
-        var added = _tagAssignmentService?.TryAssignManualTag(SelectedItem, tag) == true;
+        var added = _tagAssignmentService?.AssignManualTag(SelectedItem, tag) == true;
         if (added)
         {
             ReloadSelectedItemTags();
@@ -149,10 +154,11 @@ public partial class ItemDetails_VM : ObservableObject
             return;
         }
 
-        var tags = _tagAssignmentService.GetManualTagsForItem(SelectedItem);
-        foreach (var tag in tags)
+        var tagApplications = _dcs.GetTagApplicationsForItem(SelectedItem);
+
+        foreach (var application in tagApplications)
         {
-            SelectedItemTags.Add(tag);
+            SelectedItemTags.Add(new AppliedTag(application));
         }
     }
 

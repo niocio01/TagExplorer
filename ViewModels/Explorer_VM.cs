@@ -86,16 +86,16 @@ public partial class Explorer_VM : ObservableObject
         FileList.FolderDoubleClicked += FileListFolderDoubleClicked;
         FileList.SelectedItemChanged += FileListSelectedItemChanged;
         FileList.PropertyChanged += FileListPropertyChanged;
-        ItemDetails = new ItemDetails_VM(tagAssignmentService);
+        ItemDetails = new ItemDetails_VM(tagAssignmentService, dataCachingService);
         _breadcrumbsHistory = new ObservableCollection<List<Folder>>();
 
+        
+
         AllFilterTags = new ObservableCollection<FilterTag>();
-        List<TagDTO> dtoTags = _db?.Tags
-            .Include(tag => tag.Color)
-            .ToList() ?? [];
-        foreach (TagDTO tagDTO in dtoTags)
+        
+        foreach (Tag tag in dataCachingService.Tags)
         {
-            var ft = new FilterTag(tagDTO);
+            var ft = new FilterTag(tag);
             AllFilterTags.Add(ft);
             ft.FilterTypeChanged += TagFilterTypeChanged;
         }

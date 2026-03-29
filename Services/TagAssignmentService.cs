@@ -34,7 +34,7 @@ public class TagAssignmentService
         return tags.Select(t => t.Tag).ToList();
     }
 
-    public bool TryAssignManualTag(ExplorerItem item, Tag tag, ApplyScope scope = ApplyScope.Self)
+    public bool AssignManualTag(ExplorerItem item, Tag tag, ApplyScope scope = ApplyScope.Self)
     {
         if (tag.Id is null)
         {
@@ -48,7 +48,7 @@ public class TagAssignmentService
 
         var tagId = tag.Id.Value;
 
-        var alreadyAssigned = _db.TagAssignments.Any(a =>
+        var alreadyAssigned = _dcs.TagAssignments.Any(a =>
             a.Enabled
             && !a.IsArchived
             && a.Kind == AssignmentKind.Manual
@@ -62,7 +62,7 @@ public class TagAssignmentService
             return false;
         }
 
-        _db.TagAssignments.Add(new TagAssignment
+        TagAssignment assignment = new TagAssignment
         {
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow,
@@ -75,9 +75,12 @@ public class TagAssignmentService
             TargetPath = targetPath,
             TagId = tagId,
             MatchByAlias = true
-        });
+        };
 
-        _db.SaveChanges();
+        TagApplication application = new TagApplication(item, tag, assignment);
+
+        _dcs.AddTagApplication(application);
+        
         return true;
     }
 
@@ -125,42 +128,20 @@ public class TagAssignmentService
         return relative.Split([Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar], StringSplitOptions.RemoveEmptyEntries).Length;
     }
 
-    public bool RemoveManualTag(ExplorerItem? item, FilterTag tag)
+    public bool RemoveManualTagAssignment(TagAssignment assignment)
     {
-        if (tag.Id is null)
+        if (assignment is null)
         {
             return false;
         }
 
-        if (!TryGetAssignmentTarget(item, out var targetPath, out var targetType))
+        var applicationsOfAssignments = _dcs.TagApplications.Where(app => app.Assignment == assignment).ToList();
+
+        foreach (var app in applicationsOfAssignments)
         {
-            return false;
+            _dcs.RemoveTagApplication(app);
         }
-
-        var tagId = tag.Id.Value;
-
-        var assignments = _db.TagAssignments
-            .Where(a => a.Enabled
-                        && !a.IsArchived
-                        && a.Kind == AssignmentKind.Manual
-                        && a.TargetType == targetType
-                        && a.TargetPath == targetPath
-                        && a.TagId == tagId)
-            .ToList();
-
-        if (assignments.Count == 0)
-        {
-            return false;
-        }
-
-        foreach (var assignment in assignments)
-        {
-            assignment.Enabled = false;
-            assignment.IsArchived = true;
-            assignment.UpdatedAtUtc = DateTime.UtcNow;
-        }
-
-        _db.SaveChanges();
+                
         return true;
     }
 

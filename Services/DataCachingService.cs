@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Serilog.Core;
+using Serilog.Parsing;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -9,6 +10,7 @@ using System.Text;
 using System.Threading.Tasks;
 using TagExplorer.Data;
 using TagExplorer.Models;
+using static MaterialDesignThemes.Wpf.Theme.ToolBar;
 using File = TagExplorer.Models.File;
 
 namespace TagExplorer.Services;
@@ -29,7 +31,9 @@ public class DataCachingService
     private readonly Dictionary<int, HashSet<TagApplication>> _tagApplicationsByTagId = [];
 
     public IReadOnlyList<ExplorerItem> ItemCache => _itemCache;
-    public List<Tag> TagCache => _tagCache;
+    public List<Tag> Tags => _tagCache;
+    public List<TagAssignment> TagAssignments => _tagAssignmentCache;
+    public List<TagApplication> TagApplications => _tagApplicationCache;
 
     public DataCachingService(AppDbContext appDbContext, ILogger<ItemSearchService>? logger = null)
     {
@@ -44,7 +48,10 @@ public class DataCachingService
             .ToList();
 
         _tagCache.AddRange(cachedTagDtos.Select(dto => new Tag(dto)));
-        _tagAssignmentCache.AddRange(_db.TagAssignments.AsNoTracking().ToList());
+        _tagAssignmentCache.AddRange(
+            _db.TagAssignments.AsNoTracking()
+            .Where(a => a.IsArchived == false)
+            .ToList());
     }
 
 public void StartBuild()
@@ -126,22 +133,7 @@ public void StartBuild()
                     {
                         // create new application and save it
                         var application = new TagApplication(item, tag, assignment);
-                        _tagApplicationCache.Add(application);
-                        
-                        // cache it
-                        if (!_tagApplicationsByTagId.TryGetValue(application.Tag.Id.Value, out var applicationsOfTag))
-                        {
-                            applicationsOfTag = [];
-                            _tagApplicationsByTagId[application.Tag.Id.Value] = applicationsOfTag;
-                        }
-                        applicationsOfTag.Add(application);
-
-                        if (!_tagApplicationsByPath.TryGetValue(assignment.TargetPath, out var applicationsForPath))
-                        {
-                            applicationsForPath = [];
-                            _tagApplicationsByPath[assignment.TargetPath] = applicationsForPath;
-                        }
-                        applicationsForPath.Add(application);
+                        CacheAndIndexApplication(application);
                     }
                     break;
 
@@ -152,6 +144,30 @@ public void StartBuild()
                     break;
             }
         }
+    }
+
+    private void CacheAndIndexApplication(TagApplication application)
+    {
+        // return if it allready exists.
+        if (_tagApplicationCache.Any(app => app.Equals(application)))
+            return;
+
+        _tagApplicationCache.Add(application);
+
+        // cache it
+        if (!_tagApplicationsByTagId.TryGetValue(application.Tag.Id.Value, out var applicationsOfTag))
+        {
+            applicationsOfTag = [];
+            _tagApplicationsByTagId[application.Tag.Id.Value] = applicationsOfTag;
+        }
+        applicationsOfTag.Add(application);
+
+        if (!_tagApplicationsByPath.TryGetValue(application.Assignment.TargetPath, out var applicationsForPath))
+        {
+            applicationsForPath = [];
+            _tagApplicationsByPath[application.Assignment.TargetPath] = applicationsForPath;
+        }
+        applicationsForPath.Add(application);
     }
 
     private ExplorerItem? FindCachedItemByTargetPath(string targetPath)
@@ -191,6 +207,8 @@ public void StartBuild()
         return tagApplicationsForPath.ToList();
     }
 
+    public IReadOnlyList<TagApplication> GetTagApplicationsForItem(ExplorerItem item) => GetTagApplicationsForPath(item.Path);
+
     public IReadOnlyList<TagApplication> GetTagApplicationsForTag(int TagId)
     {
         if (!_tagApplicationsByTagId.TryGetValue(TagId, out var applicationsOfTag))
@@ -199,8 +217,6 @@ public void StartBuild()
         }
         return applicationsOfTag.ToList();
     }
-
-
 
     public IReadOnlyList<ExplorerItem> GetCandidates(
         string? rootPath,
@@ -250,6 +266,77 @@ public void StartBuild()
         return candidates.ToList();
     }
 
+    public bool AddTagApplication(TagApplication application)
+    {
+        if (application is null)
+            return false;
+
+        // add Assignment to cache and db if not allready known
+        if (!_tagAssignmentCache.Any(ass => ass.Equals(application.Assignment)))
+        {
+            _tagAssignmentCache.Add(application.Assignment);
+            _db.TagAssignments.Add(application.Assignment);
+            _db.SaveChanges();
+        }
+     
+         CacheAndIndexApplication(application);
+                
+        return true;
+    }
+
+    public bool RemoveTagApplication(TagApplication application)
+    {
+        if (application is null)
+            return false;
+
+
+        var assignment = application.Assignment;
+        RemoveApplicationFromCacheAndIndex(application);
+
+        // Remove assignment, if not used anymore
+        if (_tagAssignmentCache.Count(ass => ass.Id == application.Assignment.Id) <= 1) 
+        {
+            _tagAssignmentCache.Remove(application.Assignment);
+            var dbAssigment = _db.TagAssignments.FirstOrDefault(ass => ass.Id == application.Assignment.Id);
+            if (dbAssigment == null) return true;
+            dbAssigment.IsArchived = true;
+            dbAssigment.Enabled = false;
+            dbAssigment.UpdatedAtUtc = DateTime.UtcNow;
+            _db.SaveChanges();
+        }
+
+        return true;
+    }
+
+    private void RemoveApplicationFromCacheAndIndex(TagApplication application)
+    {
+        // remove from Indexes
+        if (_tagApplicationsByTagId.TryGetValue(application.Tag.Id.Value, out var applicationsOfTagById))
+        {
+            if (applicationsOfTagById.Count <= 1)
+            {
+                _tagApplicationsByTagId.Remove(application.Tag.Id.Value);
+            }
+            else
+            {
+                applicationsOfTagById.Remove(application);
+            }
+        }
+
+        if (_tagApplicationsByPath.TryGetValue(application.ExplorerItem.Path, out var applicationsOfTagByPath))
+        {
+            if (applicationsOfTagByPath.Count <= 1)
+            {
+                _tagApplicationsByPath.Remove(application.ExplorerItem.Path);
+            }
+            else
+            {
+                applicationsOfTagByPath.Remove(application);
+            }
+        }
+        _tagApplicationCache.Remove(application);
+    }
+
     private void FilterByRootPath(
     HashSet<ExplorerItem> items,
     string? rootPath)
@@ -282,6 +369,8 @@ public void StartBuild()
 
         items.IntersectWith(allowedItems);
     }
+
+
 
     /// <summary>
     /// Clear Cache and all indexes.

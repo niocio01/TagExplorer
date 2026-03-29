@@ -63,7 +63,7 @@ public partial class Tag : ObservableValidator, ITag
         CreatedBy = dto.CreatedBy;
         IsArchived = dto.IsArchived;
         Name = dto.Name;
-        Parent = dto.Parent is null ? null : new FilterTag(dto.Parent);
+        Parent = dto.Parent is null ? null : new Tag(dto.Parent);
         Children = [];
         Color = dto.Color;
         Description = dto.Description;
@@ -82,24 +82,38 @@ public partial class Tag : ObservableValidator, ITag
 
 public partial class FilterTag : Filter,  ITag
 {
-    public int? Id { get; set; }
-    public string? Name { get; set; }
-    public Color? Color { get; set; }
-    public string? Description { get; set; }
-    public string? IconName { get; set; }
-    public string? ShortCode { get; set; }
-    public List<string>? Aliases { get; set; }
-    public bool IsSystemTag { get; set; } = false;
+    public Tag Tag { get; init; }
 
-    public FilterTag(TagDTO tag)
+    public int? Id => Tag.Id;
+    public string? Name => Tag.Name;
+    public Color? Color => Tag.Color;
+    public string? Description => Tag.Description;
+    public string? IconName => Tag.IconName;
+    public string? ShortCode => Tag.ShortCode;
+    public List<string>? Aliases => Tag.Aliases;
+    public bool IsSystemTag => Tag.IsSystemTag;
+
+    public FilterTag(Tag tag)
     {
-        Id = tag.Id;
-        Name = tag.Name;
-        Color = tag.Color;
-        Description = tag.Description;
-        IconName = tag.IconName;
-        ShortCode = tag.ShortCode;
-        Aliases = tag.Aliases;
-        IsSystemTag = tag.IsSystemTag;
+        Tag = tag;
+    }
+}
+
+public partial class AppliedTag : ITag
+{
+    public TagApplication? Application { get; init; }
+    public Tag Tag => Application.Tag;
+    public int? Id => Tag.Id;
+    public string? Name => Tag.Name;
+    public Color? Color => Tag.Color;
+    public string? Description => Tag.Description;
+    public string? IconName => Tag.IconName;
+    public string? ShortCode => Tag.ShortCode;
+    public List<string>? Aliases => Tag.Aliases;
+    public bool IsSystemTag => Tag.IsSystemTag;
+
+    public AppliedTag(TagApplication tagApplication)
+    {        
+        Application = tagApplication;
     }
 }
