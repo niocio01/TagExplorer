@@ -387,19 +387,19 @@ public partial class FileList_VM : ObservableObject
 
     public IReadOnlyList<CompactTagToken> GetCompactTagTokens(ExplorerItem? item, int maxVisible = 3)
     {
-        if (item is null || maxVisible <= 0)
-        {
+        if (item is null || maxVisible <= 0)        
+            return [];        
+
+        var tagApplications = _dataCachingService.GetTagApplicationsForPath(item.Path);
+
+        if (tagApplications.Count == 0)
             return [];
-        }
 
-        var tagIds = _dataCachingService.GetTagApplicationsForPath(item.Path).Select(x => x.Tag.Id.Value);
-
-        var orderedDefinitions = tagIds
-            .Select(id => _compactTagDefinitionsById.TryGetValue(id, out var definition)
-                ? definition
-                : new CompactTagDefinition { Id = id, Name = id.ToString() })
-            .OrderBy(d => d.Name, StringComparer.OrdinalIgnoreCase)
-            .ToList();
+        var orderedDefinitions = tagApplications.Select(a => 
+            new CompactTagDefinition { Id = a.Tag.Id.Value, Name = a.Tag.Name, ColorHex = a.Tag.Color?.HexCode, ShortCode = a.Tag.ShortCode, IsVirtual = a.IsVirtual  })
+        .OrderBy(a => !a.IsVirtual)
+        .OrderBy(d => d.Name, StringComparer.OrdinalIgnoreCase)
+        .ToList();
 
         var visible = orderedDefinitions
             .Take(maxVisible)
@@ -408,6 +408,7 @@ public partial class FileList_VM : ObservableObject
                 Text = BuildCompactText(definition),
                 ColorHex = string.IsNullOrWhiteSpace(definition.ColorHex) ? "#FF9E9E9E" : definition.ColorHex,
                 Tooltip = definition.Name,
+                IsVirtual = definition.IsVirtual,
                 IsOverflow = false
             })
             .ToList();

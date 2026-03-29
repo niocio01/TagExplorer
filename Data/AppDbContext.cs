@@ -1,6 +1,8 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using System.IO;
 using TagExplorer.Models;
 
 namespace TagExplorer.Data;
@@ -49,5 +51,22 @@ public class AppDbContext : DbContext
                 t.HasCheckConstraint("CK_TagAssignments_AutoDirectChildren_AutoRuleParentTagIdRequired", "\"Kind\" <> 10 OR (\"TargetType\" = 0 AND \"TagId\" IS NULL AND \"AutoRuleParentTagId\" IS NOT NULL)");
             });
         });
+    }
+}
+
+public class AppDbContextFactory : IDesignTimeDbContextFactory<AppDbContext>
+{
+    public AppDbContext CreateDbContext(string[] args)
+    {
+        var basePath = Directory.GetCurrentDirectory();
+
+        var configuration = new ConfigurationBuilder()
+            .SetBasePath(basePath)
+            .AddJsonFile("appsettings.json", optional: true)
+            .AddJsonFile("appsettings.Development.json", optional: true)
+            .AddEnvironmentVariables()
+            .Build();
+
+        return new AppDbContext(configuration);
     }
 }
