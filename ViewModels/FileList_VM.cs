@@ -1,6 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
-using System.Collections.Specialized;
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.IO;
 using System.Windows;
 using TagExplorer.Data;
@@ -387,16 +387,16 @@ public partial class FileList_VM : ObservableObject
 
     public IReadOnlyList<CompactTagToken> GetCompactTagTokens(ExplorerItem? item, int maxVisible = 3)
     {
-        if (item is null || maxVisible <= 0)        
-            return [];        
+        if (item is null || maxVisible <= 0)
+            return [];
 
         var tagApplications = _dataCachingService.GetTagApplicationsForPath(item.Path);
 
         if (tagApplications.Count == 0)
             return [];
 
-        var orderedDefinitions = tagApplications.Select(a => 
-            new CompactTagDefinition { Id = a.Tag.Id.Value, Name = a.Tag.Name, ColorHex = a.Tag.Color?.HexCode, ShortCode = a.Tag.ShortCode, IsVirtual = a.IsVirtual  })
+        var orderedDefinitions = tagApplications.Select(a =>
+            new CompactTagDefinition { Id = a.Tag.Id.Value, Name = a.Tag.Name, ColorHex = a.Tag.Color?.HexCode, ShortCode = a.Tag.ShortCode, IsVirtual = a.IsVirtual })
         .OrderBy(a => !a.IsVirtual)
         .OrderBy(d => d.Name, StringComparer.OrdinalIgnoreCase)
         .ToList();

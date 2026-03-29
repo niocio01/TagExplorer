@@ -1,7 +1,7 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
-namespace TagExplorer 
+namespace TagExplorer
 {
     public partial class Filter : ObservableObject
     {

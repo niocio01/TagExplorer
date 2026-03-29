@@ -1,11 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using TagExplorer.Models;
-
-namespace TagExplorer;
+﻿namespace TagExplorer;
 
 public static class TableNames
 {

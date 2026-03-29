@@ -1,16 +1,8 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Serilog.Core;
-using Serilog.Parsing;
-using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using TagExplorer.Data;
 using TagExplorer.Models;
-using static MaterialDesignThemes.Wpf.Theme.ToolBar;
 using File = TagExplorer.Models.File;
 
 namespace TagExplorer.Services;
@@ -54,7 +46,7 @@ public class DataCachingService
             .ToList());
     }
 
-public void StartBuild()
+    public void StartBuild()
     {
         _itemCache.Clear();
     }
@@ -278,9 +270,9 @@ public void StartBuild()
             _db.TagAssignments.Add(application.Assignment);
             _db.SaveChanges();
         }
-     
-         CacheAndIndexApplication(application);
-                
+
+        CacheAndIndexApplication(application);
+
         return true;
     }
 
@@ -294,7 +286,7 @@ public void StartBuild()
         RemoveApplicationFromCacheAndIndex(application);
 
         // Remove assignment, if not used anymore
-        if (_tagAssignmentCache.Count(ass => ass.Id == application.Assignment.Id) <= 1) 
+        if (_tagAssignmentCache.Count(ass => ass.Id == application.Assignment.Id) <= 1)
         {
             _tagAssignmentCache.Remove(application.Assignment);
             var dbAssigment = _db.TagAssignments.FirstOrDefault(ass => ass.Id == application.Assignment.Id);
@@ -387,5 +379,5 @@ public void StartBuild()
         _tagApplicationsByPath.Clear();
         _tagApplicationsByTagId.Clear();
     }
-    
+
 }

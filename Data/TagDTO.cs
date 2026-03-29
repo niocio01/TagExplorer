@@ -16,7 +16,7 @@ public class TagDTO
     public string? CreatedBy { get; set; }
 
     public bool IsArchived { get; set; }
-    
+
     [Column(TypeName = "varchar(50)")]
     public string Name { get; set; }
 
@@ -26,7 +26,7 @@ public class TagDTO
 
     public int ColorId { get; set; }
     public Color Color { get; set; }
-    
+
     [Column(TypeName = "varchar(200)")]
     public string? Description { get; set; }
 
@@ -40,10 +40,10 @@ public class TagDTO
     public List<string>? Aliases { get; set; }
 
     public bool IsSystemTag { get; set; }
-    
+
     // Parameterless constructor required by EF
     public TagDTO() { }
-    
+
     public TagDTO(string name, Color color, string? description, List<string>? aliases, string iconName, bool isSystemTag = false, string? shortCode = null)
     {
         Name = name;
@@ -72,17 +72,17 @@ public static class SystemTags
         new SystemTag("Waiting", "In Progress, but waiting Status", "Blue", "Hourglass", "Status"),
         new SystemTag("Completed", "Completed Status", "Blue", "Check", "Status")
     ];
-    
+
     public static void UpdateSystemTags(AppDbContext db)
     {
         int noOfSystemTags = db.Tags.Count(e => e.IsSystemTag == true);
         if (noOfSystemTags == DefaultTags.Length)
             return;
-        
+
         var systemTags = db.Tags.Where(e => e.IsSystemTag == true);
         db.Tags.RemoveRange(systemTags);
         db.SaveChanges();
-        
+
         IQueryable<Color> defaultColors = db.Colors.Where(e => e.IsSystemColor == true);
         foreach (SystemTag tag in DefaultTags)
         {
@@ -99,6 +99,6 @@ public static class SystemTags
         }
         db.SaveChanges();
     }
-    
+
     private record SystemTag(string Name, string Description, string ColorName, string Icon, string? ParentName = null);
 }

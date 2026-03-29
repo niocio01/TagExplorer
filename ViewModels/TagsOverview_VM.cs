@@ -1,14 +1,11 @@
-﻿using System.Collections.ObjectModel;
-using System.ComponentModel;
-using System.Windows;
-using System.Windows.Data;
-using CommunityToolkit.Mvvm.ComponentModel;
+﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using CommunityToolkit.Mvvm.Messaging;
 using Microsoft.EntityFrameworkCore;
+using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
+using System.Windows;
 using TagExplorer.Data;
-using TagExplorer.Models;
 using TagExplorer.Views;
 using Color = TagExplorer.Data.Color;
 
@@ -16,15 +13,15 @@ namespace TagExplorer.ViewModels;
 
 public partial class TagsOverview_VM : ObservableValidator
 {
-    [ObservableProperty] 
+    [ObservableProperty]
     private ObservableCollection<Tag_VM> _tagVMs;
 
-    [ObservableProperty] 
+    [ObservableProperty]
     private ObservableCollection<ColorButton_VM> _colorButtonVMs;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(
-        nameof(SelectedTag), 
+        nameof(SelectedTag),
    [
         nameof(EditEnabled),
         nameof(SomeTagIsSelected),
@@ -71,7 +68,7 @@ public partial class TagsOverview_VM : ObservableValidator
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(EditEnabled))]
     private bool _newTagEdit;
-    
+
     public TagDTO? SelectedTag => SelectedTagVM?.Tag;
     public bool SomeTagIsSelected => SelectedTag is not null;
     public bool EditEnabled => SomeTagIsSelected || NewTagEdit;

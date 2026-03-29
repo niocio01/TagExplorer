@@ -1,7 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 using System.IO;
 using TagExplorer.Models;
 
@@ -10,7 +9,7 @@ namespace TagExplorer.Data;
 public class AppDbContext : DbContext
 {
     protected readonly IConfiguration Configuration;
-    
+
     public AppDbContext(IConfiguration configuration)
     {
         Configuration = configuration;
@@ -21,7 +20,7 @@ public class AppDbContext : DbContext
         // connect to Postgres DB with 
         options.UseNpgsql(Configuration.GetConnectionString("database"));
     }
-    
+
     public DbSet<BaseFolder> BaseFolders { get; set; }
     public DbSet<Color> Colors { get; set; }
     public DbSet<TagDTO> Tags { get; set; }

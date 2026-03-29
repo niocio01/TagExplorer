@@ -3,21 +3,9 @@ using FuzzySharp;
 using FuzzySharp.Extractor;
 using MaterialDesignThemes.Wpf;
 using Microsoft.Extensions.DependencyInjection;
-using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
 using System.Windows.Interop;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Shapes;
 using TagExplorer.Data;
 
 namespace TagExplorer.Views;
@@ -88,7 +76,7 @@ public partial class IconSelector_V : Window
         {
             FilteredIcons.Add(new IconButton_V(sortedFavourite.Value, true));
         }
-        
+
         if (FavouritesOnly)
         {
             return;

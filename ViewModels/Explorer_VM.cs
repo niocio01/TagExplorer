@@ -2,12 +2,8 @@
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Linq;
-using System.Text;
 using TagExplorer.Data;
 using TagExplorer.Models;
 using TagExplorer.Services;
@@ -35,9 +31,9 @@ public partial class Explorer_VM : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(GoForwardAvailable), nameof(GoBackAvailable))]
     private int _currentHistoryPosition;
-    
+
     public bool GoBackAvailable => CurrentHistoryPosition >= 1;
-    public bool GoForwardAvailable => CurrentHistoryPosition < BreadcrumbsHistory.Count-1;
+    public bool GoForwardAvailable => CurrentHistoryPosition < BreadcrumbsHistory.Count - 1;
     public bool IsCacheBuilding => FileList.IsCacheBuilding;
 
     [ObservableProperty]
@@ -89,10 +85,10 @@ public partial class Explorer_VM : ObservableObject
         ItemDetails = new ItemDetails_VM(tagAssignmentService, dataCachingService);
         _breadcrumbsHistory = new ObservableCollection<List<Folder>>();
 
-        
+
 
         AllFilterTags = new ObservableCollection<FilterTag>();
-        
+
         foreach (Tag tag in dataCachingService.Tags)
         {
             var ft = new FilterTag(tag);
@@ -169,7 +165,7 @@ public partial class Explorer_VM : ObservableObject
             return;
         }
 
-        var currentBreadcrumb = Breadcrumbs[ Breadcrumbs.Count - 1 ];
+        var currentBreadcrumb = Breadcrumbs[Breadcrumbs.Count - 1];
 
         if (currentBreadcrumb.Name == "BaseFolders")
         {
@@ -181,7 +177,7 @@ public partial class Explorer_VM : ObservableObject
             Breadcrumbs.Add(new Folder(folder.Name, currentBreadcrumb, false));
         }
 
-        Folder newCurrentFolder = Breadcrumbs[ Breadcrumbs.Count - 1 ];
+        Folder newCurrentFolder = Breadcrumbs[Breadcrumbs.Count - 1];
 
         SetCurrentFolderItems(newCurrentFolder);
 
@@ -288,7 +284,7 @@ public partial class Explorer_VM : ObservableObject
         if (!GoBackAvailable)
             return;
 
-        CurrentHistoryPosition --;
+        CurrentHistoryPosition--;
         Breadcrumbs = new ObservableCollection<Folder>(BreadcrumbsHistory[CurrentHistoryPosition]);
 
         if (Breadcrumbs.Count > 0)

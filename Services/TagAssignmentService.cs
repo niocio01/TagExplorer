@@ -1,4 +1,3 @@
-using Microsoft.EntityFrameworkCore;
 using System.IO;
 using TagExplorer.Data;
 using TagExplorer.Models;
@@ -29,7 +28,7 @@ public class TagAssignmentService
         if (tags.Count == 0)
         {
             return [];
-        }        
+        }
 
         return tags.Select(t => t.Tag).ToList();
     }
@@ -80,19 +79,8 @@ public class TagAssignmentService
         TagApplication application = new TagApplication(item, tag, assignment);
 
         _dcs.AddTagApplication(application);
-        
+
         return true;
-    }
-
-    private static void AddTagId(IDictionary<string, HashSet<int>> map, string path, int tagId)
-    {
-        if (!map.TryGetValue(path, out var tagIds))
-        {
-            tagIds = [];
-            map[path] = tagIds;
-        }
-
-        tagIds.Add(tagId);
     }
 
     private static bool IsDescendantOrSelf(string itemPath, string ancestorPath)
@@ -141,16 +129,26 @@ public class TagAssignmentService
         {
             _dcs.RemoveTagApplication(app);
         }
-                
+
         return true;
     }
 
+    private static void AddTagId(IDictionary<string, HashSet<int>> map, string path, int tagId)
+    {
+        if (!map.TryGetValue(path, out var tagIds))
+        {
+            tagIds = [];
+            map[path] = tagIds;
+        }
+
+        tagIds.Add(tagId);
+    }
     private static bool TryGetAssignmentTarget(ExplorerItem item, out string targetPath, out TargetType targetType)
     {
         targetPath = item.Path;
         switch (item)
-        {            
-            case Folder:                
+        {
+            case Folder:
                 targetType = TargetType.Folder;
                 return true;
 

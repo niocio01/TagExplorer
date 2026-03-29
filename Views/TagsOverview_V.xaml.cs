@@ -12,7 +12,7 @@ namespace TagExplorer.Views
         public TagsOverview_V()
         {
             InitializeComponent();
-                
+
             DataContext = App.AppHost!.Services.GetRequiredService<TagsOverview_VM>();
         }
     }

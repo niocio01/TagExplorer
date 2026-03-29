@@ -25,7 +25,7 @@ public class BaseFolder
     public BaseFolder()
     {
     }
-    
+
 
     public BaseFolder(
         string path,

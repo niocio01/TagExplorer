@@ -19,7 +19,7 @@ public partial class Tag_VM : ObservableObject
 
 
 
-    public Tag_VM() {}
+    public Tag_VM() { }
 
     public Tag_VM(TagDTO tag)
     {

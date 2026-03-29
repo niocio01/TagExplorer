@@ -1,11 +1,8 @@
 using Microsoft.Extensions.Logging;
-using System.Collections.Concurrent;
-using System.Collections.ObjectModel;
 using System.IO;
 using System.Threading.Channels;
 using TagExplorer.Data;
 using TagExplorer.Models;
-using static MaterialDesignThemes.Wpf.Theme.ToolBar;
 using File = TagExplorer.Models.File;
 using Folder = TagExplorer.Models.Folder;
 
@@ -222,7 +219,7 @@ public class ItemSearchService
         return _cachedItems;
     }
 
-    
+
     public async Task<IReadOnlyList<ExplorerItem>> GetFilteredItemsAsync(
         FilterCriteria filterCriteria,
         CancellationToken cancellationToken = default)
@@ -250,7 +247,7 @@ public class ItemSearchService
             return false;
         }
         item = _cachedItems.FirstOrDefault(item => string.Equals(item.Path, path, StringComparison.OrdinalIgnoreCase));
-        if (item == null) 
+        if (item == null)
             return false;
         return true;
     }
@@ -361,7 +358,7 @@ public class ItemSearchService
         return depth;
     }
 
-    
+
 }
 
 public readonly record struct FilterCriteria(

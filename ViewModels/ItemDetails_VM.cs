@@ -4,7 +4,6 @@ using Microsoft.Extensions.DependencyInjection;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.IO;
-using System.Linq;
 using System.Windows;
 using TagExplorer.Models;
 using TagExplorer.Services;
@@ -144,7 +143,7 @@ public partial class ItemDetails_VM : ObservableObject
 
     private void ReloadSelectedItemTags()
     {
-        if(SelectedItem is null)
+        if (SelectedItem is null)
             return;
 
         SelectedItemTags.Clear();

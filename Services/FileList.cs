@@ -113,7 +113,7 @@ public static class FileList
                     return false;
             }
         }
-           
+
 
         if (!MatchesExtensionFilter(item, options.RequiredExtensions))
         {
@@ -173,7 +173,7 @@ public static class FileList
             }
         }
     }
-    
+
     private static bool MatchesExtensionFilter(ExplorerItem item, IReadOnlySet<string> requiredExtensions)
     {
         if (requiredExtensions.Count == 0)

@@ -3,11 +3,11 @@ using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
 using CommunityToolkit.Mvvm.Messaging.Messages;
 using Microsoft.Extensions.DependencyInjection;
-using System.Windows;
 using System.Windows.Controls;
 using TagExplorer.Data;
 
 namespace TagExplorer.Views;
+
 [ObservableObject]
 public partial class IconButton_V : UserControl
 {
@@ -26,7 +26,7 @@ public partial class IconButton_V : UserControl
         InitializeComponent();
     }
 
-    public IconButton_V() {}
+    public IconButton_V() { }
 
     [RelayCommand]
     public void ButtonClicked()
@@ -43,8 +43,8 @@ public partial class IconButton_V : UserControl
 
         if (IsFavourite)
         {
-           db.IconFavourites.Add(new IconFavourite(IconName));
-           db.SaveChanges();
+            db.IconFavourites.Add(new IconFavourite(IconName));
+            db.SaveChanges();
         }
         else
         {

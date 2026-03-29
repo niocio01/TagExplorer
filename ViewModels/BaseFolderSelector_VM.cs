@@ -1,9 +1,9 @@
-﻿using System.Collections.ObjectModel;
-using System.IO;
-using CommunityToolkit.Mvvm.ComponentModel;
+﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.WindowsAPICodePack.Dialogs;
+using System.Collections.ObjectModel;
+using System.IO;
 using TagExplorer.Data;
 using Path = System.IO.Path;
 
@@ -34,7 +34,7 @@ public partial class BaseFolderSelector_VM : ObservableObject
             if (!_db.BaseFolders.Any(bf => bf.Path == path))
             {
                 BaseFolders.Add(new BaseFolder { Name = FolderName, Path = path });
-                
+
             }
         }
     }

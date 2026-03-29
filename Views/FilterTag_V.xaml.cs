@@ -1,6 +1,5 @@
 using CommunityToolkit.Mvvm.Input;
 using System.Windows.Controls;
-using TagExplorer.Models;
 
 namespace TagExplorer.Views;
 

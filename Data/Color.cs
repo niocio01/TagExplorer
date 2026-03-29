@@ -1,5 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace TagExplorer.Data;
@@ -8,10 +7,10 @@ public class Color
 {
     [Key]
     public int Id { get; set; }
-    
+
     [Column(TypeName = "varchar(50)")]
     public string? Name { get; set; }
-    
+
     [Required]
     [Column(TypeName = "varchar(7)")]
     [RegularExpression("^#[0-9a-fA-F]{6}$", ErrorMessage = "Hex code must be 7 characters long")]
@@ -58,11 +57,11 @@ public static class SystemColors
         int noOfSystemColors = db.Colors.Count(e => e.IsSystemColor == true);
         if (noOfSystemColors == DefaultColors.Count)
             return;
-        
+
         var systemColors = db.Colors.Where(e => e.IsSystemColor == true);
         db.Colors.RemoveRange(systemColors);
         db.SaveChanges();
-        
+
         foreach (KeyValuePair<string, string> color in DefaultColors)
         {
             db.Colors.Add(new Color(color.Key, color.Value, true));

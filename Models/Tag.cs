@@ -1,5 +1,4 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
-using CommunityToolkit.Mvvm.Input;
 using System.ComponentModel.DataAnnotations;
 using TagExplorer.Data;
 
@@ -39,7 +38,7 @@ public partial class Tag : ObservableValidator, ITag
     [StringLength(50)]
     private string? _name;
 
-    [ObservableProperty] 
+    [ObservableProperty]
     [Required]
     private Color? _color;
 
@@ -80,7 +79,7 @@ public partial class Tag : ObservableValidator, ITag
     }
 }
 
-public partial class FilterTag : Filter,  ITag
+public partial class FilterTag : Filter, ITag
 {
     public Tag Tag { get; init; }
 
@@ -113,7 +112,7 @@ public partial class AppliedTag : ITag
     public bool IsSystemTag => Tag.IsSystemTag;
 
     public AppliedTag(TagApplication tagApplication)
-    {        
+    {
         Application = tagApplication;
     }
 }
