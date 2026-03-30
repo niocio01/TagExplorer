@@ -85,8 +85,6 @@ public partial class Explorer_VM : ObservableObject
         ItemDetails = new ItemDetails_VM(tagAssignmentService, dataCachingService);
         _breadcrumbsHistory = new ObservableCollection<List<Folder>>();
 
-
-
         AllFilterTags = new ObservableCollection<FilterTag>();
 
         foreach (Tag tag in dataCachingService.Tags)

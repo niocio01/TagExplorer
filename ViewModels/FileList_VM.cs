@@ -347,7 +347,26 @@ public partial class FileList_VM : ObservableObject
 
     private async Task<IReadOnlyList<ExplorerItem>> BuildFilteredItemsAsync(CancellationToken cancellationToken)
     {
-        if (_currentFolder is null || _itemSearchService is null)
+        if (_currentFolder is null)
+        {
+            if (_itemSearchService is null || (!HasActiveFileFilters && !HasActiveTagFilters))
+            {
+                return BuildFilteredItemsFromCurrentFolder(cancellationToken);
+            }
+
+            var homeFilterCriteria = new FilterCriteria(
+                null,
+                _requiredTagIdsCache,
+                _disallowedTagIdsCache,
+                _requiredExtensionsCache,
+                IncludeHidden: true,
+                IncludeSubItems: IncludeSubdirectoriesForSearch);
+
+            var homeCandidates = await _itemSearchService.GetFilteredItemsAsync(homeFilterCriteria, cancellationToken);
+            return ScopeToHome(homeCandidates, _homeBaseFolders, IncludeSubdirectoriesForSearch, _showFolders, cancellationToken);
+        }
+
+        if (_itemSearchService is null)
         {
             return BuildFilteredItemsFromCurrentFolder(cancellationToken);
         }
@@ -362,6 +381,74 @@ public partial class FileList_VM : ObservableObject
 
         var candidates = await _itemSearchService.GetFilteredItemsAsync(filterCriteria, cancellationToken);
         return ScopeToCurrentFolder(candidates, _currentFolder, IncludeSubdirectoriesForSearch, _showFolders, cancellationToken);
+    }
+
+    private static IReadOnlyList<ExplorerItem> ScopeToHome(
+        IReadOnlyList<ExplorerItem> source,
+        IReadOnlyList<BaseFolder> homeBaseFolders,
+        bool includeSubItems,
+        bool includeFolders,
+        CancellationToken cancellationToken)
+    {
+        if (homeBaseFolders.Count == 0)
+        {
+            return [];
+        }
+
+        var rootPaths = new HashSet<string>(
+            homeBaseFolders
+                .Where(folder => !string.IsNullOrWhiteSpace(folder.Path))
+                .Select(folder => folder.Path),
+            StringComparer.OrdinalIgnoreCase);
+
+        var result = new List<ExplorerItem>(source.Count);
+
+        foreach (var item in source)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (!includeFolders && item is Folder)
+            {
+                continue;
+            }
+
+            if (!TryGetRootPath(item, out var rootPath) || !rootPaths.Contains(rootPath))
+            {
+                continue;
+            }
+
+            if (includeSubItems)
+            {
+                result.Add(item);
+                continue;
+            }
+
+            if (item.ParentFolder?.ParentFolder is null)
+            {
+                result.Add(item);
+            }
+        }
+
+        return result;
+    }
+
+    private static bool TryGetRootPath(ExplorerItem item, out string rootPath)
+    {
+        rootPath = string.Empty;
+
+        ExplorerItem? current = item;
+        while (current is not null && current.ParentFolder is not null)
+        {
+            current = current.ParentFolder;
+        }
+
+        if (current is null || string.IsNullOrWhiteSpace(current.Path))
+        {
+            return false;
+        }
+
+        rootPath = current.Path;
+        return true;
     }
 
     private IReadOnlyList<ExplorerItem> BuildFilteredItemsFromCurrentFolder(CancellationToken cancellationToken)
