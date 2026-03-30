@@ -1,11 +1,13 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using CommunityToolkit.Mvvm.Messaging;
 using Microsoft.Extensions.DependencyInjection;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.IO;
 using System.Windows;
 using TagExplorer.Models;
+using TagExplorer.Models.Messages;
 using TagExplorer.Services;
 using File = TagExplorer.Models.File;
 using Folder = TagExplorer.Models.Folder;
@@ -76,6 +78,35 @@ public partial class ItemDetails_VM : ObservableObject
     {
         _tagAssignmentService = tagAssignmentService;
         _dcs = dataCachingService;
+
+        WeakReferenceMessenger.Default.Register<TagApplicationsChangedMessage>(this, static (recipient, message) =>
+        {
+            ((ItemDetails_VM)recipient).HandleTagApplicationsChanged(message);
+        });
+    }
+
+    private void HandleTagApplicationsChanged(TagApplicationsChangedMessage message)
+    {
+        if (SelectedItem is null)
+        {
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(message.AffectedPath)
+            && !string.Equals(message.AffectedPath, SelectedItem.Path, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        var dispatcher = Application.Current?.Dispatcher;
+
+        if (dispatcher is not null && !dispatcher.CheckAccess())
+        {
+            _ = dispatcher.InvokeAsync(ReloadSelectedItemTags);
+            return;
+        }
+
+        ReloadSelectedItemTags();
     }
 
     [RelayCommand]

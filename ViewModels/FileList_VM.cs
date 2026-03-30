@@ -191,9 +191,25 @@ public partial class FileList_VM : ObservableObject
         FolderDoubleClicked?.Invoke(this, folder);
     }
 
+    public bool TryAddDroppedTagToItem(ExplorerItem targetItem, object? dropData)
+    {
+        return dropData switch
+        {
+            FilterTag filterTag => AddTagToItem(targetItem, filterTag.Tag),
+            Tag tag => AddTagToItem(targetItem, tag),
+            Tag_VM tagVm => AddTagToItem(targetItem, new Tag(tagVm.Tag)),
+            _ => false
+        };
+    }
+
     partial void OnSelectedItemChanged(ExplorerItem? value)
     {
         SelectedItemChanged?.Invoke(this, value);
+    }
+
+    private bool AddTagToItem(ExplorerItem item, Tag tag)
+    {
+        return _tagAssignmentService?.AssignManualTag(item, tag) == true;
     }
 
     private async Task SetCurrentFolderItemsAsync(Folder newCurrentFolder)

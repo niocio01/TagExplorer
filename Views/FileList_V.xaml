@@ -22,7 +22,24 @@
         <ListBox.ItemContainerStyle>
             <Style TargetType="{x:Type ListBoxItem}" BasedOn="{StaticResource {x:Type ListBoxItem}}">
                 <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                <Setter Property="AllowDrop" Value="True" />
                 <EventSetter Event="MouseDoubleClick" Handler="ListBoxItem_MouseDoubleClick"/>
+                <EventSetter Event="Drop" Handler="ListBoxItem_Drop"/>
+
+                <EventSetter Event="DragEnter" Handler="Item_DragEnter"/>
+                <EventSetter Event="DragLeave" Handler="Item_DragLeave"/>
+
+                <Style.Triggers>
+                    <!-- When Tag is "IsDraggingOver", show the highlight -->
+                    <Trigger Property="Tag" Value="IsDraggingOver">
+                        <Setter Property="Background">
+                            <Setter.Value>
+                                <SolidColorBrush Color="{Binding Color, Source={StaticResource MaterialDesign.Brush.Foreground}}" 
+                                 Opacity="0.2" />
+                            </Setter.Value>
+                        </Setter>
+                    </Trigger>
+                </Style.Triggers>
             </Style>
         </ListBox.ItemContainerStyle>
         <ListBox.ItemTemplate>
