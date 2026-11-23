@@ -5,6 +5,7 @@ using Microsoft.WindowsAPICodePack.Dialogs;
 using System.Collections.ObjectModel;
 using System.IO;
 using TagExplorer.Data;
+using TagExplorer.Services;
 using Path = System.IO.Path;
 
 namespace TagExplorer.ViewModels;
@@ -56,6 +57,12 @@ public partial class BaseFolderSelector_VM : ObservableObject
             _db.BaseFolders.AddRange(addedFolders);
         }
         _db.SaveChanges();
+
+        if (deletedFolders.Count > 0 || addedFolders.Count > 0)
+        {
+            var itemSearchService = App.AppHost?.Services.GetService<ItemSearchService>();
+            _ = itemSearchService?.RebuildCacheAsync(BaseFolders.ToList());
+        }
     }
 
     private void PopulateFolderStatsIfMissing()

@@ -1,5 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Messaging;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.IO;
@@ -66,6 +68,7 @@ public partial class FileList_VM : ObservableObject
     private readonly TagAssignmentService? _tagAssignmentService;
     private readonly ItemSearchService? _itemSearchService;
     private readonly DataCachingService? _dataCachingService;
+    private readonly ILogger<FileList_VM>? _logger = App.AppHost?.Services.GetService<ILogger<FileList_VM>>();
     private IReadOnlyDictionary<int, CompactTagDefinition> _compactTagDefinitionsById =
         new Dictionary<int, CompactTagDefinition>();
     private List<BaseFolder> _homeBaseFolders = [];
@@ -244,11 +247,19 @@ public partial class FileList_VM : ObservableObject
 
     private void ApplyCacheBuildProgress(in ItemCacheBuildProgress progress)
     {
+        var wasCacheBuilding = IsCacheBuilding;
+
         ScannedFolderCount = progress.ScannedFolderCount;
         ScannedFileCount = progress.ScannedFileCount;
         ScannedDepth = progress.ScannedDepth;
         IsCacheBuilding = !progress.IsCompleted;
         EstimatedSearchProgress = progress.PercentageCompleted;
+
+        // Results computed during the build came from the previous cache; refresh them.
+        if (wasCacheBuilding && progress.IsCompleted && (_currentFolder is not null || HasActiveFileFilters || HasActiveTagFilters))
+        {
+            RebuildFilteredItems();
+        }
     }
 
     private void OnFilteredFolderItemsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -335,6 +346,10 @@ public partial class FileList_VM : ObservableObject
         }
         catch (OperationCanceledException)
         {
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Filtering the file list failed.");
         }
         finally
         {

@@ -19,6 +19,8 @@ public class ItemSearchService
 {
     private readonly DataCachingService _dataCachingService;
     private readonly ILogger<ItemSearchService>? _logger;
+    private readonly SemaphoreSlim _buildLock = new(1, 1);
+    private CancellationTokenSource? _buildCancellation;
     private IReadOnlyList<ExplorerItem> _cachedItems = Array.Empty<ExplorerItem>();
     private ItemCacheBuildProgress _lastCacheBuildProgress = new(0, 0, 0, 0, true);
 
@@ -31,14 +33,67 @@ public class ItemSearchService
         _logger = logger;
     }
 
+    /// <summary>
+    /// Rebuilds the item cache for the given base folders. A running build is cancelled first.
+    /// Never throws; failures are logged and the previous cache stays in use.
+    /// </summary>
+    public async Task RebuildCacheAsync(IReadOnlyList<BaseFolder> baseFolders)
+    {
+        try
+        {
+            await BuildCacheAndIndexesAsync(baseFolders);
+        }
+        catch (OperationCanceledException)
+        {
+            // A newer build replaced this one.
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Cache build failed.");
+            var last = _lastCacheBuildProgress;
+            ReportCacheBuildProgress(last with { IsCompleted = true });
+        }
+    }
+
+    /// <summary>
+    /// Builds the item cache for the given base folders and publishes it when complete.
+    /// A running build is cancelled first; builds never run in parallel.
+    /// </summary>
     public async Task<IReadOnlyList<ExplorerItem>> BuildCacheAndIndexesAsync(
         IReadOnlyList<BaseFolder> baseFolders,
-        IReadOnlyList<TagAssignment> tagAssignments,
         int maxDegreeOfParallelism = 0,
         CancellationToken cancellationToken = default)
     {
+        var buildCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var previousBuildCancellation = Interlocked.Exchange(ref _buildCancellation, buildCancellation);
+        previousBuildCancellation?.Cancel();
+
+        await _buildLock.WaitAsync(buildCancellation.Token);
+        try
+        {
+            return await BuildCacheAndIndexesCoreAsync(baseFolders, maxDegreeOfParallelism, buildCancellation.Token);
+        }
+        catch
+        {
+            _dataCachingService.AbortBuild();
+            throw;
+        }
+        finally
+        {
+            _buildLock.Release();
+            Interlocked.CompareExchange(ref _buildCancellation, null, buildCancellation);
+            buildCancellation.Dispose();
+        }
+    }
+
+    private async Task<IReadOnlyList<ExplorerItem>> BuildCacheAndIndexesCoreAsync(
+        IReadOnlyList<BaseFolder> baseFolders,
+        int maxDegreeOfParallelism,
+        CancellationToken cancellationToken)
+    {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         ReportCacheBuildProgress(new ItemCacheBuildProgress(0, 0, 0, 0, false));
+        // Expected item count from the stored base folder stats; may be 0 or outdated.
         int totalItemsToScan = baseFolders.Sum(f => f.FileCount + f.DirectoryCount);
 
         _logger?.LogInformation(
@@ -94,6 +149,13 @@ public class ItemSearchService
             SingleWriter = false
         });
 
+        var enumerationOptions = new EnumerationOptions
+        {
+            IgnoreInaccessible = true,
+            AttributesToSkip = 0,
+            RecurseSubdirectories = false
+        };
+
         _dataCachingService.StartBuild();
         var cachedItems = new List<ExplorerItem>();
         var scannedFolderCount = 0;
@@ -123,7 +185,7 @@ public class ItemSearchService
                 if (processedCount == 1 || processedCount % 200 == 0)
                 {
                     ReportCacheBuildProgress(new ItemCacheBuildProgress(
-                        processedCount * 100 / totalItemsToScan,
+                        GetPercentage(processedCount, totalItemsToScan),
                         scannedFolderCount,
                         scannedFileCount,
                         scannedDepth,
@@ -132,73 +194,71 @@ public class ItemSearchService
             }
         }, cancellationToken);
 
-        var pendingFolders = roots.Count;
-
-        foreach (var root in roots)
+        try
         {
-            await itemChannel.Writer.WriteAsync(root, cancellationToken);
-            await folderChannel.Writer.WriteAsync(root, cancellationToken);
-        }
+            var pendingFolders = roots.Count;
 
-        var workers = Enumerable.Range(0, workerCount)
-            .Select(_ => Task.Run(async () =>
+            foreach (var root in roots)
             {
-                while (await folderChannel.Reader.WaitToReadAsync(cancellationToken))
+                await itemChannel.Writer.WriteAsync(root, cancellationToken);
+                await folderChannel.Writer.WriteAsync(root, cancellationToken);
+            }
+
+            var workers = Enumerable.Range(0, workerCount)
+                .Select(_ => Task.Run(async () =>
                 {
-                    while (folderChannel.Reader.TryRead(out var folder))
+                    while (await folderChannel.Reader.WaitToReadAsync(cancellationToken))
                     {
-                        cancellationToken.ThrowIfCancellationRequested();
+                        while (folderChannel.Reader.TryRead(out var folder))
+                        {
+                            try
+                            {
+                                cancellationToken.ThrowIfCancellationRequested();
 
-                        IEnumerable<string> subDirectories;
-                        try
-                        {
-                            subDirectories = Directory.EnumerateDirectories(folder.Path);
-                        }
-                        catch
-                        {
-                            subDirectories = Enumerable.Empty<string>();
-                        }
+                                foreach (var subDirectoryPath in EnumerateSafely(() => Directory.EnumerateDirectories(folder.Path, "*", enumerationOptions), folder.Path))
+                                {
+                                    var subFolder = new Folder(Path.GetFileName(subDirectoryPath), folder, false);
+                                    folder.Children.Add(subFolder);
 
-                        foreach (var subDirectoryPath in subDirectories)
-                        {
-                            var subFolder = new Folder(Path.GetFileName(subDirectoryPath), folder, false);
-                            folder.Children.Add(subFolder);
+                                    Interlocked.Increment(ref pendingFolders);
+                                    await itemChannel.Writer.WriteAsync(subFolder, cancellationToken);
+                                    await folderChannel.Writer.WriteAsync(subFolder, cancellationToken);
+                                }
 
-                            Interlocked.Increment(ref pendingFolders);
-                            await itemChannel.Writer.WriteAsync(subFolder, cancellationToken);
-                            await folderChannel.Writer.WriteAsync(subFolder, cancellationToken);
-                        }
-
-                        IEnumerable<string> files;
-                        try
-                        {
-                            files = Directory.EnumerateFiles(folder.Path);
-                        }
-                        catch
-                        {
-                            files = Enumerable.Empty<string>();
-                        }
-
-                        foreach (var filePath in files)
-                        {
-                            var file = new File(Path.GetFileName(filePath), folder, Path.GetExtension(filePath), filePath, false);
-                            folder.Children.Add(file);
-                            await itemChannel.Writer.WriteAsync(file, cancellationToken);
-                        }
-
-                        if (Interlocked.Decrement(ref pendingFolders) == 0)
-                        {
-                            folderChannel.Writer.TryComplete();
+                                foreach (var filePath in EnumerateSafely(() => Directory.EnumerateFiles(folder.Path, "*", enumerationOptions), folder.Path))
+                                {
+                                    var file = new File(Path.GetFileName(filePath), folder, Path.GetExtension(filePath), filePath, false);
+                                    folder.Children.Add(file);
+                                    await itemChannel.Writer.WriteAsync(file, cancellationToken);
+                                }
+                            }
+                            finally
+                            {
+                                // Always count the folder as done, so the scan cannot hang on a failed folder.
+                                if (Interlocked.Decrement(ref pendingFolders) == 0)
+                                {
+                                    folderChannel.Writer.TryComplete();
+                                }
+                            }
                         }
                     }
-                }
-            }, cancellationToken))
-            .ToArray();
+                }, cancellationToken))
+                .ToArray();
 
-        await Task.WhenAll(workers);
-        itemChannel.Writer.TryComplete();
+            await Task.WhenAll(workers);
+        }
+        finally
+        {
+            // Lets the indexer finish, also when scanning failed or was cancelled.
+            itemChannel.Writer.TryComplete();
+            folderChannel.Writer.TryComplete();
+        }
+
         await indexerTask;
-        _dataCachingService.BuildTagIndex();
+        cancellationToken.ThrowIfCancellationRequested();
+
+        _cachedItems = cachedItems;
+        _dataCachingService.CompleteBuild();
 
         ReportCacheBuildProgress(new ItemCacheBuildProgress(
             100,
@@ -207,7 +267,6 @@ public class ItemSearchService
             scannedDepth,
             true));
 
-        _cachedItems = cachedItems;
         stopwatch.Stop();
         _logger?.LogInformation(
             "Cache build finished. DurationMs={DurationMs}, Items={Items}, Folders={Folders}, Files={Files}, Depth={Depth}",
@@ -217,6 +276,35 @@ public class ItemSearchService
             scannedFileCount,
             scannedDepth);
         return _cachedItems;
+    }
+
+    /// <summary>
+    /// Returns the progress in percent, capped at 100. Returns 0 if the expected total is unknown.
+    /// </summary>
+    private static float GetPercentage(int processedCount, int totalCount)
+    {
+        if (totalCount <= 0)
+        {
+            return 0;
+        }
+
+        return Math.Min(100f, processedCount * 100f / totalCount);
+    }
+
+    /// <summary>
+    /// Runs the enumeration and returns the entries; returns none if the folder cannot be read.
+    /// </summary>
+    private List<string> EnumerateSafely(Func<IEnumerable<string>> enumerate, string folderPath)
+    {
+        try
+        {
+            return enumerate().ToList();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _logger?.LogDebug(ex, "Skipping unreadable folder {FolderPath}", folderPath);
+            return [];
+        }
     }
 
 

@@ -102,29 +102,24 @@ public partial class App : Application
 
     private async Task WarmupItemCacheAsync()
     {
+        List<BaseFolder> baseFolders;
         try
         {
             using var scope = ServiceProvider.CreateScope();
-            var scopedProvider = scope.ServiceProvider;
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-            var db = scopedProvider.GetRequiredService<AppDbContext>();
-            var itemSearchService = scopedProvider.GetRequiredService<ItemSearchService>();
-
-            var baseFolders = await db.BaseFolders
+            baseFolders = await db.BaseFolders
                 .AsNoTracking()
                 .ToListAsync();
-
-            var tagAssignments = await db.TagAssignments
-                .AsNoTracking()
-                .Where(a => a.Enabled && !a.IsArchived && a.Kind == AssignmentKind.Manual && a.TagId.HasValue)
-                .ToListAsync();
-
-            await itemSearchService.BuildCacheAndIndexesAsync(baseFolders, tagAssignments);
-
         }
-        catch
+        catch (Exception ex)
         {
+            ServiceProvider.GetService<ILogger<App>>()?.LogError(ex, "Loading the base folders for the cache build failed.");
+            return;
         }
+
+        // Logs its own failures.
+        await ServiceProvider.GetRequiredService<ItemSearchService>().RebuildCacheAsync(baseFolders);
     }
 
     private async Task<bool> EnsureDatabaseReadyAsync(AppDbContext db, IConfiguration config)

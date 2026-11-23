@@ -9,27 +9,50 @@ using File = TagExplorer.Models.File;
 
 namespace TagExplorer.Services;
 
+/// <summary>
+/// Holds the item cache with its indexes and the tag applications of the cached items.
+/// </summary>
+/// <remarks>
+/// A cache build fills a separate pending index (StartBuild, AddItem) and publishes it as a whole
+/// (CompleteBuild), so queries never see a half-built cache. All other shared state is guarded by
+/// <see cref="_sync"/>, because queries run on worker threads while tags are changed on the UI thread.
+/// </remarks>
 public class DataCachingService
 {
-    private AppDbContext _db;
-    private ILogger<ItemSearchService>? _logger;
+    private readonly AppDbContext _db;
+    private readonly ILogger<DataCachingService>? _logger;
+    private readonly object _sync = new();
 
-    private readonly List<ExplorerItem> _itemCache = [];
-    private readonly Dictionary<string, HashSet<ExplorerItem>> _itemsByRootPath = [];
-    private readonly Dictionary<string, HashSet<ExplorerItem>> _itemsByExtension = [];
+    private ItemIndex _items = ItemIndex.Empty;
+    private ItemIndex? _pendingItems;
 
     private readonly List<Tag> _tagCache = [];
     private readonly List<TagAssignment> _tagAssignmentCache = [];
     private readonly List<TagApplication> _tagApplicationCache = [];
-    private readonly Dictionary<string, HashSet<TagApplication>> _tagApplicationsByPath = [];
+    private readonly Dictionary<string, HashSet<TagApplication>> _tagApplicationsByPath = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<int, HashSet<TagApplication>> _tagApplicationsByTagId = [];
 
-    public IReadOnlyList<ExplorerItem> ItemCache => _itemCache;
-    public List<Tag> Tags => _tagCache;
-    public List<TagAssignment> TagAssignments => _tagAssignmentCache;
-    public List<TagApplication> TagApplications => _tagApplicationCache;
+    /// <summary>
+    /// The published item cache. The list is never changed after publishing.
+    /// </summary>
+    public IReadOnlyList<ExplorerItem> ItemCache => _items.Items;
 
-    public DataCachingService(AppDbContext appDbContext, ILogger<ItemSearchService>? logger = null)
+    public IReadOnlyList<Tag> Tags
+    {
+        get { lock (_sync) return _tagCache.ToList(); }
+    }
+
+    public IReadOnlyList<TagAssignment> TagAssignments
+    {
+        get { lock (_sync) return _tagAssignmentCache.ToList(); }
+    }
+
+    public IReadOnlyList<TagApplication> TagApplications
+    {
+        get { lock (_sync) return _tagApplicationCache.ToList(); }
+    }
+
+    public DataCachingService(AppDbContext appDbContext, ILogger<DataCachingService>? logger = null)
     {
         _db = appDbContext;
         _logger = logger;
@@ -44,124 +67,116 @@ public class DataCachingService
         _tagCache.AddRange(cachedTagDtos.Select(dto => new Tag(dto)));
         _tagAssignmentCache.AddRange(
             _db.TagAssignments.AsNoTracking()
-            .Where(a => a.IsArchived == false)
+            .Where(a => !a.IsArchived && a.Enabled && a.TagId != null)
             .ToList());
     }
 
+    /// <summary>
+    /// Starts a new cache build. Items added with <see cref="AddItem"/> stay invisible until
+    /// <see cref="CompleteBuild"/> publishes them.
+    /// </summary>
     public void StartBuild()
     {
-        _itemCache.Clear();
+        _pendingItems = new ItemIndex();
     }
 
     /// <summary>
-    /// Adds the EplorerItem to the Cache and updates the indexes for root path and extension.
+    /// Adds the item to the pending cache build. Must be called from one thread at a time.
     /// </summary>
-    /// <remarks>
-    /// Note: The index for the tags must be built separately by calling BuildTagIndex after all items have been added.
-    /// </remarks>
-
     /// <param name="item">The explorer item to add.</param>
-    public void AddItem(
-        ExplorerItem item)
+    public void AddItem(ExplorerItem item)
     {
-        _itemCache.Add(item);
-
-        if (item is Folder folder)
-        {
-            var rootPath = System.IO.Directory.GetParent(folder.Path)?.FullName;
-            if (!string.IsNullOrWhiteSpace(rootPath))
-            {
-                if (!_itemsByRootPath.TryGetValue(rootPath, out var itemsForRoot))
-                {
-                    itemsForRoot = new HashSet<ExplorerItem>();
-                    _itemsByRootPath[rootPath] = itemsForRoot;
-                }
-                itemsForRoot.Add(item);
-            }
-        }
-
-
-        if (item is File file)
-        {
-            if (!_itemsByRootPath.TryGetValue(file.JustPath, out var rootPath))
-            {
-                rootPath = new HashSet<ExplorerItem>();
-                _itemsByRootPath[file.JustPath] = rootPath;
-            }
-            rootPath.Add(file);
-
-
-            if (!_itemsByExtension.TryGetValue(file.Extension, out var extensionPaths))
-            {
-                extensionPaths = new HashSet<ExplorerItem>();
-                _itemsByExtension[file.Extension] = extensionPaths;
-            }
-
-            extensionPaths.Add(file);
-        }
+        var pendingItems = _pendingItems
+            ?? throw new InvalidOperationException("StartBuild must be called before AddItem.");
+        pendingItems.Add(item);
     }
 
-    public void BuildTagIndex()
+    /// <summary>
+    /// Discards the pending cache build and keeps the published cache.
+    /// </summary>
+    public void AbortBuild()
     {
-        if (_tagAssignmentCache.Count < 0) return;
+        _pendingItems = null;
+    }
 
-        foreach (var assignment in _tagAssignmentCache)
+    /// <summary>
+    /// Publishes the pending cache build and rebuilds the tag applications for the new items.
+    /// </summary>
+    public void CompleteBuild()
+    {
+        var pendingItems = _pendingItems
+            ?? throw new InvalidOperationException("StartBuild must be called before CompleteBuild.");
+        _pendingItems = null;
+
+        lock (_sync)
         {
-            var item = FindCachedItemByTargetPath(assignment.TargetPath);
-            if (item is null)
-            {
-                _logger.LogWarning("No cached EplorerItem found for TagAssignment with id {TagAssignmentId} and target path {TargetPath}", assignment.Id, assignment.TargetPath);
-                continue;
-            }
+            _items = pendingItems;
+            ClearTagApplications();
 
-            var tag = _tagCache.FirstOrDefault(t => t.Id == assignment.TagId.Value);
-            if (tag == null)
+            foreach (var assignment in _tagAssignmentCache)
             {
-                _logger.LogWarning("Tag with id {TagId} not found for TagAssignment with id {TagAssignmentId}", assignment.TagId.Value, assignment.Id);
-                continue;
-            }
-
-            switch (assignment.Kind)
-            {
-                case AssignmentKind.Manual:
-                    {
-                        // create new application and save it
-                        var application = new TagApplication(item, tag, assignment);
-                        CacheAndIndexApplication(application);
-                    }
-                    break;
-
-                case AssignmentKind.AutoDirectChildrenAsChildTag:
-                    // TODO: Implement this assignment kind by finding all direct children of the target item and adding them to the index with the same tag id.
-                    break;
-                default:
-                    break;
+                ApplyAssignment(assignment);
             }
         }
 
         WeakReferenceMessenger.Default.Send(new TagApplicationsChangedMessage());
     }
 
+    private void ApplyAssignment(TagAssignment assignment)
+    {
+        var item = FindCachedItemByTargetPath(assignment.TargetPath);
+        if (item is null)
+        {
+            _logger?.LogWarning("No cached ExplorerItem found for TagAssignment with id {TagAssignmentId} and target path {TargetPath}", assignment.Id, assignment.TargetPath);
+            return;
+        }
+
+        var tag = _tagCache.FirstOrDefault(t => t.Id == assignment.TagId);
+        if (tag is null)
+        {
+            _logger?.LogWarning("Tag with id {TagId} not found for TagAssignment with id {TagAssignmentId}", assignment.TagId, assignment.Id);
+            return;
+        }
+
+        switch (assignment.Kind)
+        {
+            case AssignmentKind.Manual:
+                CacheAndIndexApplication(new TagApplication(item, tag, assignment));
+                break;
+
+            case AssignmentKind.AutoDirectChildrenAsChildTag:
+                // TODO: Implement this assignment kind by finding all direct children of the target item and adding them to the index with the same tag id.
+                break;
+
+            default:
+                break;
+        }
+    }
+
     private void CacheAndIndexApplication(TagApplication application)
     {
-        // return if it allready exists.
-        if (_tagApplicationCache.Any(app => app.Equals(application)))
+        var path = application.ExplorerItem.Path;
+
+        if (_tagApplicationsByPath.TryGetValue(path, out var applicationsForPath)
+            && applicationsForPath.Any(app => app.Assignment == application.Assignment && app.ExplorerItem == application.ExplorerItem))
+        {
             return;
+        }
 
         _tagApplicationCache.Add(application);
 
-        // cache it
-        if (!_tagApplicationsByTagId.TryGetValue(application.Tag.Id.Value, out var applicationsOfTag))
+        var tagId = application.Tag.Id!.Value;
+        if (!_tagApplicationsByTagId.TryGetValue(tagId, out var applicationsOfTag))
         {
             applicationsOfTag = [];
-            _tagApplicationsByTagId[application.Tag.Id.Value] = applicationsOfTag;
+            _tagApplicationsByTagId[tagId] = applicationsOfTag;
         }
         applicationsOfTag.Add(application);
 
-        if (!_tagApplicationsByPath.TryGetValue(application.Assignment.TargetPath, out var applicationsForPath))
+        if (applicationsForPath is null)
         {
             applicationsForPath = [];
-            _tagApplicationsByPath[application.Assignment.TargetPath] = applicationsForPath;
+            _tagApplicationsByPath[path] = applicationsForPath;
         }
         applicationsForPath.Add(application);
     }
@@ -172,9 +187,10 @@ public class DataCachingService
         {
             return null;
         }
-        var parentPath = System.IO.Directory.GetParent(targetPath).FullName;
 
-        if (!_itemsByRootPath.TryGetValue(parentPath, out var itemsAtPath) || itemsAtPath.Count == 0)
+        var parentPath = Directory.GetParent(targetPath)?.FullName;
+        if (parentPath is null
+            || !_items.ItemsByParentPath.TryGetValue(parentPath, out var itemsAtPath))
         {
             return null;
         }
@@ -196,22 +212,24 @@ public class DataCachingService
 
     public IReadOnlyList<TagApplication> GetTagApplicationsForPath(string path)
     {
-        if (!_tagApplicationsByPath.TryGetValue(path, out var tagApplicationsForPath))
+        lock (_sync)
         {
-            return [];
+            return _tagApplicationsByPath.TryGetValue(path, out var applicationsForPath)
+                ? applicationsForPath.ToList()
+                : [];
         }
-        return tagApplicationsForPath.ToList();
     }
 
     public IReadOnlyList<TagApplication> GetTagApplicationsForItem(ExplorerItem item) => GetTagApplicationsForPath(item.Path);
 
-    public IReadOnlyList<TagApplication> GetTagApplicationsForTag(int TagId)
+    public IReadOnlyList<TagApplication> GetTagApplicationsForTag(int tagId)
     {
-        if (!_tagApplicationsByTagId.TryGetValue(TagId, out var applicationsOfTag))
+        lock (_sync)
         {
-            return [];
+            return _tagApplicationsByTagId.TryGetValue(tagId, out var applicationsOfTag)
+                ? applicationsOfTag.ToList()
+                : [];
         }
-        return applicationsOfTag.ToList();
     }
 
     public IReadOnlyList<ExplorerItem> GetCandidates(
@@ -220,12 +238,15 @@ public class DataCachingService
         IReadOnlySet<int> disallowedTagIds,
         IReadOnlySet<string> requiredExtensions)
     {
-        var candidates = new HashSet<ExplorerItem>(_itemCache);
+        // Take consistent snapshots under the lock; the set operations below run without it.
+        ItemIndex items;
+        var itemsPerRequiredTag = new List<HashSet<ExplorerItem>>(requiredTagIds.Count);
+        var itemsWithDisallowedTag = new HashSet<ExplorerItem>();
 
-        FilterByRootPath(candidates, rootPath);
-
-        if (requiredTagIds.Count > 0)
+        lock (_sync)
         {
+            items = _items;
+
             foreach (var tagId in requiredTagIds)
             {
                 if (!_tagApplicationsByTagId.TryGetValue(tagId, out var applicationsOfTag))
@@ -233,30 +254,43 @@ public class DataCachingService
                     return [];
                 }
 
-                candidates.IntersectWith(applicationsOfTag.Select(a => a.ExplorerItem));
+                itemsPerRequiredTag.Add(applicationsOfTag.Select(a => a.ExplorerItem).ToHashSet());
             }
-        }
 
-        if (disallowedTagIds.Count > 0)
-        {
             foreach (var tagId in disallowedTagIds)
             {
                 if (_tagApplicationsByTagId.TryGetValue(tagId, out var applicationsOfTag))
                 {
-                    candidates.ExceptWith(applicationsOfTag.Select(a => a.ExplorerItem));
+                    itemsWithDisallowedTag.UnionWith(applicationsOfTag.Select(a => a.ExplorerItem));
                 }
             }
         }
 
+        var candidates = string.IsNullOrWhiteSpace(rootPath)
+            ? new HashSet<ExplorerItem>(items.Items)
+            : GetItemsBelow(items, rootPath);
+
+        foreach (var itemsWithTag in itemsPerRequiredTag)
+        {
+            candidates.IntersectWith(itemsWithTag);
+        }
+
+        candidates.ExceptWith(itemsWithDisallowedTag);
+
         if (requiredExtensions.Count > 0)
         {
+            // An item matches if it has any of the required extensions.
+            var itemsWithAnyRequiredExtension = new HashSet<ExplorerItem>();
             foreach (var extension in requiredExtensions)
             {
-                if (_itemsByExtension.TryGetValue(extension, out var itemsWithRequiredExtention))
+                var normalizedExtension = extension.TrimStart('.').ToLowerInvariant();
+                if (items.ItemsByExtension.TryGetValue(normalizedExtension, out var itemsWithExtension))
                 {
-                    candidates.IntersectWith(itemsWithRequiredExtention);
+                    itemsWithAnyRequiredExtension.UnionWith(itemsWithExtension);
                 }
             }
+
+            candidates.IntersectWith(itemsWithAnyRequiredExtension);
         }
 
         return candidates.ToList();
@@ -267,15 +301,34 @@ public class DataCachingService
         if (application is null)
             return false;
 
-        // add Assignment to cache and db if not allready known
-        if (!_tagAssignmentCache.Any(ass => ass.Equals(application.Assignment)))
+        bool isNewAssignment;
+        lock (_sync)
         {
-            _tagAssignmentCache.Add(application.Assignment);
+            isNewAssignment = !_tagAssignmentCache.Contains(application.Assignment);
+        }
+
+        // Store a new assignment before caching it, so the cache never holds unsaved assignments.
+        if (isNewAssignment)
+        {
             _db.TagAssignments.Add(application.Assignment);
             _db.SaveChanges();
         }
 
-        CacheAndIndexApplication(application);
+        lock (_sync)
+        {
+            if (isNewAssignment)
+            {
+                _tagAssignmentCache.Add(application.Assignment);
+            }
+
+            // Tags created after startup are not in the cache yet; a later rebuild needs them.
+            if (application.Tag.Id is not null && _tagCache.All(t => t.Id != application.Tag.Id))
+            {
+                _tagCache.Add(application.Tag);
+            }
+
+            CacheAndIndexApplication(application);
+        }
 
         WeakReferenceMessenger.Default.Send(new TagApplicationsChangedMessage(application.ExplorerItem.Path));
 
@@ -287,20 +340,31 @@ public class DataCachingService
         if (application is null)
             return false;
 
-
         var assignment = application.Assignment;
-        RemoveApplicationFromCacheAndIndex(application);
+        bool isAssignmentUnused;
 
-        // Remove assignment, if not used anymore
-        if (_tagAssignmentCache.Count(ass => ass.Id == application.Assignment.Id) <= 1)
+        lock (_sync)
         {
-            _tagAssignmentCache.Remove(application.Assignment);
-            var dbAssigment = _db.TagAssignments.FirstOrDefault(ass => ass.Id == application.Assignment.Id);
-            if (dbAssigment == null) return true;
-            dbAssigment.IsArchived = true;
-            dbAssigment.Enabled = false;
-            dbAssigment.UpdatedAtUtc = DateTime.UtcNow;
-            _db.SaveChanges();
+            RemoveApplicationFromCacheAndIndex(application);
+
+            isAssignmentUnused = !_tagApplicationCache.Any(app => app.Assignment == assignment);
+            if (isAssignmentUnused)
+            {
+                _tagAssignmentCache.Remove(assignment);
+            }
+        }
+
+        // Archive the assignment once no application uses it anymore.
+        if (isAssignmentUnused)
+        {
+            var dbAssignment = _db.TagAssignments.FirstOrDefault(ass => ass.Id == assignment.Id);
+            if (dbAssignment is not null)
+            {
+                dbAssignment.IsArchived = true;
+                dbAssignment.Enabled = false;
+                dbAssignment.UpdatedAtUtc = DateTime.UtcNow;
+                _db.SaveChanges();
+            }
         }
 
         WeakReferenceMessenger.Default.Send(new TagApplicationsChangedMessage(application.ExplorerItem.Path));
@@ -310,82 +374,112 @@ public class DataCachingService
 
     private void RemoveApplicationFromCacheAndIndex(TagApplication application)
     {
-        // remove from Indexes
-        if (_tagApplicationsByTagId.TryGetValue(application.Tag.Id.Value, out var applicationsOfTagById))
+        var tagId = application.Tag.Id!.Value;
+        if (_tagApplicationsByTagId.TryGetValue(tagId, out var applicationsOfTag))
         {
-            if (applicationsOfTagById.Count <= 1)
+            applicationsOfTag.Remove(application);
+            if (applicationsOfTag.Count == 0)
             {
-                _tagApplicationsByTagId.Remove(application.Tag.Id.Value);
-            }
-            else
-            {
-                applicationsOfTagById.Remove(application);
+                _tagApplicationsByTagId.Remove(tagId);
             }
         }
 
-        if (_tagApplicationsByPath.TryGetValue(application.ExplorerItem.Path, out var applicationsOfTagByPath))
+        var path = application.ExplorerItem.Path;
+        if (_tagApplicationsByPath.TryGetValue(path, out var applicationsForPath))
         {
-            if (applicationsOfTagByPath.Count <= 1)
+            applicationsForPath.Remove(application);
+            if (applicationsForPath.Count == 0)
             {
-                _tagApplicationsByPath.Remove(application.ExplorerItem.Path);
-            }
-            else
-            {
-                applicationsOfTagByPath.Remove(application);
+                _tagApplicationsByPath.Remove(path);
             }
         }
+
         _tagApplicationCache.Remove(application);
     }
 
-    private void FilterByRootPath(
-    HashSet<ExplorerItem> items,
-    string? rootPath)
+    private static HashSet<ExplorerItem> GetItemsBelow(ItemIndex items, string rootPath)
     {
-        if (items.Count == 0 || string.IsNullOrWhiteSpace(rootPath))
-        {
-            return;
-        }
+        var result = new HashSet<ExplorerItem>();
+        var pathPrefix = rootPath + Path.DirectorySeparatorChar;
 
-        if (!_itemsByRootPath.TryGetValue(rootPath, out var rootItems) || rootItems.Count == 0)
+        foreach (var (parentPath, itemsOfPath) in items.ItemsByParentPath)
         {
-            items.Clear();
-            return;
-        }
-
-        var allowedPaths = _itemsByRootPath.Keys
-            .Where(
-                path => string.Equals(path, rootPath, StringComparison.OrdinalIgnoreCase)
-                || path.StartsWith(rootPath + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
-            .ToList();
-
-        HashSet<ExplorerItem> allowedItems = new HashSet<ExplorerItem>();
-        foreach (var path in allowedPaths)
-        {
-            if (_itemsByRootPath.TryGetValue(path, out var itemsOfPath))
+            if (string.Equals(parentPath, rootPath, StringComparison.OrdinalIgnoreCase)
+                || parentPath.StartsWith(pathPrefix, StringComparison.OrdinalIgnoreCase))
             {
-                allowedItems.UnionWith(itemsOfPath);
+                result.UnionWith(itemsOfPath);
             }
         }
 
-        items.IntersectWith(allowedItems);
+        return result;
     }
 
-
-
-    /// <summary>
-    /// Clear Cache and all indexes.
-    /// </summary>
-    public void Clear()
+    private void ClearTagApplications()
     {
-        _itemCache.Clear();
-        _itemsByRootPath.Clear();
-        _itemsByExtension.Clear();
-
-        _tagCache.Clear();
-        _tagAssignmentCache.Clear();
         _tagApplicationCache.Clear();
         _tagApplicationsByPath.Clear();
         _tagApplicationsByTagId.Clear();
     }
 
+    /// <summary>
+    /// Clears the item cache and the tag applications. Tags and tag assignments stay cached,
+    /// because they are only loaded at startup.
+    /// </summary>
+    public void Clear()
+    {
+        _pendingItems = null;
+
+        lock (_sync)
+        {
+            _items = ItemIndex.Empty;
+            ClearTagApplications();
+        }
+
+        WeakReferenceMessenger.Default.Send(new TagApplicationsChangedMessage());
+    }
+
+    /// <summary>
+    /// The cached items with lookups by parent path and by extension.
+    /// </summary>
+    private sealed class ItemIndex
+    {
+        public static readonly ItemIndex Empty = new();
+
+        public List<ExplorerItem> Items { get; } = [];
+        public Dictionary<string, HashSet<ExplorerItem>> ItemsByParentPath { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<string, HashSet<ExplorerItem>> ItemsByExtension { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+        public void Add(ExplorerItem item)
+        {
+            Items.Add(item);
+
+            var parentPath = item switch
+            {
+                File file => file.JustPath,
+                Folder folder => Directory.GetParent(folder.Path)?.FullName,
+                _ => null
+            };
+
+            if (!string.IsNullOrWhiteSpace(parentPath))
+            {
+                AddToIndex(ItemsByParentPath, parentPath, item);
+            }
+
+            if (item is File fileItem)
+            {
+                AddToIndex(ItemsByExtension, fileItem.Extension, item);
+            }
+        }
+
+        private static void AddToIndex(Dictionary<string, HashSet<ExplorerItem>> index, string key, ExplorerItem item)
+        {
+            if (!index.TryGetValue(key, out var items))
+            {
+                items = [];
+                index[key] = items;
+            }
+
+            items.Add(item);
+        }
+    }
 }

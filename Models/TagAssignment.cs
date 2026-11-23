@@ -62,20 +62,10 @@ public class TagApplication
     public Tag Tag { get; init; }
     public TagAssignment Assignment { get; init; }
 
-    private bool? _isVirtual = null;
-    public bool IsVirtual
-    {
-        get
-        {
-            if (_isVirtual is null)
-            {
-                if (ExplorerItem.Path == Assignment.TargetPath)
-                    _isVirtual = false;
-                _isVirtual = true;
-            }
-            return _isVirtual.Value;
-        }
-    }
+    /// <summary>
+    /// True if the tag reaches this item through an assignment on another item (e.g. a parent folder).
+    /// </summary>
+    public bool IsVirtual => !string.Equals(ExplorerItem.Path, Assignment.TargetPath, StringComparison.OrdinalIgnoreCase);
 
     public TagApplication(ExplorerItem explorerItem, Tag tag, TagAssignment assignment)
     {
