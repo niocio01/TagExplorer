@@ -363,7 +363,8 @@ public partial class FileList_VM : ObservableObject
                 IncludeSubItems: IncludeSubdirectoriesForSearch);
 
             var homeCandidates = await _itemSearchService.GetFilteredItemsAsync(homeFilterCriteria, cancellationToken);
-            return ScopeToHome(homeCandidates, _homeBaseFolders, IncludeSubdirectoriesForSearch, _showFolders, cancellationToken);
+            var homeItems = ScopeToHome(homeCandidates, _homeBaseFolders, IncludeSubdirectoriesForSearch, _showFolders, cancellationToken);
+            return await ExcludeHiddenIfRequestedAsync(homeItems, cancellationToken);
         }
 
         if (_itemSearchService is null)
@@ -380,7 +381,21 @@ public partial class FileList_VM : ObservableObject
             IncludeSubItems: IncludeSubdirectoriesForSearch);
 
         var candidates = await _itemSearchService.GetFilteredItemsAsync(filterCriteria, cancellationToken);
-        return ScopeToCurrentFolder(candidates, _currentFolder, IncludeSubdirectoriesForSearch, _showFolders, cancellationToken);
+        var folderItems = ScopeToCurrentFolder(candidates, _currentFolder, IncludeSubdirectoriesForSearch, _showFolders, cancellationToken);
+        return await ExcludeHiddenIfRequestedAsync(folderItems, cancellationToken);
+    }
+
+    private async Task<IReadOnlyList<ExplorerItem>> ExcludeHiddenIfRequestedAsync(
+        IReadOnlyList<ExplorerItem> items,
+        CancellationToken cancellationToken)
+    {
+        if (_showHiddenFiles)
+        {
+            return items;
+        }
+
+        // Reading the attributes touches the disk, so keep it off the UI thread.
+        return await Task.Run(() => FileList.ExcludeHidden(items, cancellationToken), cancellationToken);
     }
 
     private static IReadOnlyList<ExplorerItem> ScopeToHome(

@@ -104,14 +104,9 @@ public static class FileList
             }
         }
 
-        if (!options.ShowHiddenFiles)
+        if (!options.ShowHiddenFiles && IsHidden(item))
         {
-            if (item.IsHidden == null)
-            {
-                item.LoadAdditionalProperties();
-                if (item.IsHidden == false)
-                    return false;
-            }
+            return false;
         }
 
 
@@ -126,6 +121,46 @@ public static class FileList
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// Returns whether the item is hidden, loading its attributes from disk on first use.
+    /// Items whose attributes cannot be read count as not hidden.
+    /// </summary>
+    public static bool IsHidden(ExplorerItem item)
+    {
+        if (item.IsHidden is null)
+        {
+            try
+            {
+                item.LoadAdditionalProperties();
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                return false;
+            }
+        }
+
+        return item.IsHidden == true;
+    }
+
+    /// <summary>
+    /// Returns the items that are not hidden.
+    /// </summary>
+    public static IReadOnlyList<ExplorerItem> ExcludeHidden(IReadOnlyList<ExplorerItem> items, CancellationToken cancellationToken)
+    {
+        var result = new List<ExplorerItem>(items.Count);
+        foreach (var item in items)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (!IsHidden(item))
+            {
+                result.Add(item);
+            }
+        }
+
+        return result;
     }
 
     private static int GetDepth(string rootPath, string currentPath)
