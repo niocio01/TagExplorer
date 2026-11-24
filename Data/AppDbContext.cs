@@ -43,6 +43,7 @@ public class AppDbContext : DbContext
             entity.HasIndex(e => new { e.Enabled, e.TargetType, e.TargetPath });
             entity.HasIndex(e => new { e.Kind, e.Enabled });
             entity.HasIndex(e => e.TagId);
+            entity.HasIndex(e => e.AutoRuleParentTagId);
 
             entity.ToTable(t =>
             {
