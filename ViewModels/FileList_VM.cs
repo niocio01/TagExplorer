@@ -204,7 +204,7 @@ public partial class FileList_VM : ObservableObject
         {
             FilterTag filterTag => AddTagToItem(targetItem, filterTag.Tag),
             Tag tag => AddTagToItem(targetItem, tag),
-            Tag_VM tagVm => AddTagToItem(targetItem, new Tag(tagVm.Tag)),
+            Tag_VM tagVm => AddTagToItem(targetItem, _dataCachingService?.GetTag(tagVm.Tag.Id) ?? new Tag(tagVm.Tag)),
             _ => false
         };
     }

@@ -224,6 +224,7 @@ public partial class TagsOverview_VM : ObservableValidator
             TagDTO newDTOTag = new(Name!, Color!, Description, ParseAliases(), IconName!, shortCode: ShortCode);
             _db.Tags.Add(newDTOTag);
             _db.SaveChanges();
+            _dataCachingService?.UpsertTag(newDTOTag);
 
             var newTagVm = new Tag_VM(newDTOTag);
             TagVMs.Add(newTagVm);
@@ -239,6 +240,7 @@ public partial class TagsOverview_VM : ObservableValidator
             SelectedTag.ShortCode = ShortCode;
             SelectedTag.Color = Color;
             _db.SaveChanges();
+            _dataCachingService?.UpsertTag(SelectedTag);
             TagVMs.First(t => t.Tag == SelectedTag).UpdateProps();
         }
 
@@ -279,6 +281,7 @@ public partial class TagsOverview_VM : ObservableValidator
         TagVMs.Remove(TagVMs.First(vm => vm.Tag == tag));
         _db.Tags.Remove(tag);
         _db.SaveChanges();
+        _dataCachingService?.RemoveTag(tag.Id);
 
         ClearEditor();
     }

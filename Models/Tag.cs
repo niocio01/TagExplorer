@@ -72,6 +72,21 @@ public partial class Tag : ObservableValidator, ITag
         IsSystemTag = dto.IsSystemTag;
     }
 
+    /// <summary>
+    /// Copies the editable values of a saved tag, so objects already referencing this tag show the changes.
+    /// </summary>
+    public void UpdateFrom(TagDTO dto)
+    {
+        UpdatedAtUtc = dto.UpdatedAtUtc;
+        Name = dto.Name;
+        Color = dto.Color;
+        Description = dto.Description;
+        IconName = dto.IconName;
+        ShortCode = dto.ShortCode;
+        Aliases = dto.Aliases;
+        IsSystemTag = dto.IsSystemTag;
+    }
+
     public bool IsValid()
     {
         ValidateAllProperties();
@@ -95,6 +110,8 @@ public partial class FilterTag : Filter, ITag
     public FilterTag(Tag tag)
     {
         Tag = tag;
+        // The chip binds to the forwarding properties above, so pass on the tag's changes.
+        Tag.PropertyChanged += (_, e) => OnPropertyChanged(e.PropertyName);
     }
 }
 

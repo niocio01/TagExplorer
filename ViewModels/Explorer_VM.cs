@@ -1,11 +1,13 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using CommunityToolkit.Mvvm.Messaging;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using TagExplorer.Data;
 using TagExplorer.Models;
+using TagExplorer.Models.Messages;
 using TagExplorer.Services;
 using Folder = TagExplorer.Models.Folder;
 
@@ -70,6 +72,7 @@ public partial class Explorer_VM : ObservableObject
     private int _disallowedExtentionFilterCount;
 
     private AppDbContext? _db;
+    private readonly DataCachingService? _dataCachingService;
 
     public Explorer_VM()
     {
@@ -77,6 +80,7 @@ public partial class Explorer_VM : ObservableObject
         var tagAssignmentService = App.AppHost?.Services.GetService<TagAssignmentService>();
         var itemSearchService = App.AppHost?.Services.GetService<ItemSearchService>();
         var dataCachingService = App.AppHost?.Services.GetService<DataCachingService>();
+        _dataCachingService = dataCachingService;
         var baseFolders = _db?.BaseFolders.AsNoTracking().ToList() ?? [];
 
         FileList = new FileList_VM(tagAssignmentService, itemSearchService, dataCachingService);
@@ -90,10 +94,13 @@ public partial class Explorer_VM : ObservableObject
 
         foreach (Tag tag in dataCachingService.Tags)
         {
-            var ft = new FilterTag(tag);
-            AllFilterTags.Add(ft);
-            ft.FilterTypeChanged += TagFilterTypeChanged;
+            AddFilterTag(tag);
         }
+
+        WeakReferenceMessenger.Default.Register<TagsChangedMessage>(this, static (recipient, _) =>
+        {
+            ((Explorer_VM)recipient).SyncFilterTags();
+        });
 
         AllFilterExtention_VMs = new ObservableCollection<ExtentionButton_VM>();
         foreach (FileType fileType in FileTypes.Types)
@@ -108,6 +115,55 @@ public partial class Explorer_VM : ObservableObject
 
         SetCurrentPathToHome(baseFolders);
         AddToHistory(Breadcrumbs.ToList());
+    }
+
+    private void AddFilterTag(Tag tag)
+    {
+        var filterTag = new FilterTag(tag);
+        filterTag.FilterTypeChanged += TagFilterTypeChanged;
+        AllFilterTags.Add(filterTag);
+    }
+
+    // Brings the tag filter chips in line with the cached tags after tags were created or deleted.
+    // Edited tags need nothing here: the chips reference the cached Tag objects, which are updated in place.
+    private void SyncFilterTags()
+    {
+        if (_dataCachingService is null)
+        {
+            return;
+        }
+
+        var dispatcher = System.Windows.Application.Current?.Dispatcher;
+        if (dispatcher is not null && !dispatcher.CheckAccess())
+        {
+            _ = dispatcher.InvokeAsync(SyncFilterTags);
+            return;
+        }
+
+        var cachedTags = _dataCachingService.Tags;
+        var cachedTagIds = cachedTags.Select(tag => tag.Id).ToHashSet();
+
+        var removedFilterTags = AllFilterTags.Where(filterTag => !cachedTagIds.Contains(filterTag.Id)).ToList();
+        var removedActiveFilter = false;
+        foreach (var filterTag in removedFilterTags)
+        {
+            filterTag.FilterTypeChanged -= TagFilterTypeChanged;
+            removedActiveFilter |= filterTag.FilterType != FilterTypes.None;
+            AllFilterTags.Remove(filterTag);
+        }
+
+        var shownTagIds = AllFilterTags.Select(filterTag => filterTag.Id).ToHashSet();
+        foreach (var tag in cachedTags.Where(tag => !shownTagIds.Contains(tag.Id)))
+        {
+            AddFilterTag(tag);
+        }
+
+        if (removedActiveFilter)
+        {
+            RequiredTagFilterCount = _requiredTagFilters.Count;
+            DisallowedTagFilterCount = _disallowedTagFilters.Count;
+            ApplyFileListFilters(reloadCurrentFolder: false);
+        }
     }
 
     private void FileListSelectedItemChanged(object? sender, ExplorerItem? selectedItem)

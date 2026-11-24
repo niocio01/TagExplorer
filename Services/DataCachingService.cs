@@ -306,6 +306,50 @@ public class DataCachingService
         return candidates.ToList();
     }
 
+    public Tag? GetTag(int tagId)
+    {
+        lock (_sync)
+        {
+            return _tagCache.FirstOrDefault(t => t.Id == tagId);
+        }
+    }
+
+    /// <summary>
+    /// Adds a newly saved tag to the cache, or updates the cached one in place so existing
+    /// applications, badges and filter chips keep referencing the same object.
+    /// </summary>
+    public void UpsertTag(TagDTO dto)
+    {
+        Tag? cachedTag;
+        lock (_sync)
+        {
+            cachedTag = _tagCache.FirstOrDefault(t => t.Id == dto.Id);
+            if (cachedTag is null)
+            {
+                _tagCache.Add(new Tag(dto));
+            }
+        }
+
+        // Outside the lock: this raises PropertyChanged, which updates bound UI.
+        cachedTag?.UpdateFrom(dto);
+
+        WeakReferenceMessenger.Default.Send(new TagsChangedMessage());
+        WeakReferenceMessenger.Default.Send(new TagApplicationsChangedMessage());
+    }
+
+    /// <summary>
+    /// Removes a deleted tag from the cache. Remove its applications first (RemoveTagApplication).
+    /// </summary>
+    public void RemoveTag(int tagId)
+    {
+        lock (_sync)
+        {
+            _tagCache.RemoveAll(t => t.Id == tagId);
+        }
+
+        WeakReferenceMessenger.Default.Send(new TagsChangedMessage());
+    }
+
     public bool AddTagApplication(TagApplication application)
     {
         if (application is null)
