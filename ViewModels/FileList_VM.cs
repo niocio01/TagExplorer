@@ -63,6 +63,7 @@ public partial class FileList_VM : ObservableObject
     private bool _showFolders = true;
     private bool _showHiddenFiles;
     private readonly HashSet<string> _requiredExtensionsCache = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _disallowedExtensionsCache = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<int> _requiredTagIdsCache = [];
     private readonly HashSet<int> _disallowedTagIdsCache = [];
     private readonly TagAssignmentService? _tagAssignmentService;
@@ -87,10 +88,11 @@ public partial class FileList_VM : ObservableObject
         _showHiddenFiles,
         _currentItemsExcludeHidden,
         _requiredExtensionsCache,
+        _disallowedExtensionsCache,
         _requiredTagIdsCache,
         _disallowedTagIdsCache);
 
-    private bool HasActiveFileFilters => _requiredExtensionsCache.Count > 0;
+    private bool HasActiveFileFilters => _requiredExtensionsCache.Count > 0 || _disallowedExtensionsCache.Count > 0;
     private bool HasActiveTagFilters => _requiredTagIdsCache.Count > 0 || _disallowedTagIdsCache.Count > 0;
 
     private bool IncludeSubdirectoriesForSearch => _doRecursiveSearch && (HasActiveFileFilters || HasActiveTagFilters);
@@ -137,6 +139,7 @@ public partial class FileList_VM : ObservableObject
         bool showFolders,
         bool showHiddenFiles,
         IEnumerable<string> requiredExtensions,
+        IEnumerable<string> disallowedExtensions,
         IEnumerable<int> requiredTagIds,
         IEnumerable<int> disallowedTagIds,
         bool reloadCurrentFolder)
@@ -145,7 +148,8 @@ public partial class FileList_VM : ObservableObject
         _showFolders = showFolders;
         _showHiddenFiles = showHiddenFiles;
 
-        FileList.RebuildRequiredExtensions(_requiredExtensionsCache, requiredExtensions);
+        FileList.RebuildExtensions(_requiredExtensionsCache, requiredExtensions);
+        FileList.RebuildExtensions(_disallowedExtensionsCache, disallowedExtensions);
         RebuildRequiredTagIds(_requiredTagIdsCache, requiredTagIds);
         RebuildRequiredTagIds(_disallowedTagIdsCache, disallowedTagIds);
 
@@ -374,6 +378,7 @@ public partial class FileList_VM : ObservableObject
                 _requiredTagIdsCache,
                 _disallowedTagIdsCache,
                 _requiredExtensionsCache,
+                _disallowedExtensionsCache,
                 IncludeHidden: true,
                 IncludeSubItems: IncludeSubdirectoriesForSearch);
 
@@ -392,6 +397,7 @@ public partial class FileList_VM : ObservableObject
             _requiredTagIdsCache,
             _disallowedTagIdsCache,
             _requiredExtensionsCache,
+            _disallowedExtensionsCache,
             IncludeHidden: true,
             IncludeSubItems: IncludeSubdirectoriesForSearch);
 

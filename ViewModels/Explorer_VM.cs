@@ -352,6 +352,7 @@ public partial class Explorer_VM : ObservableObject
             ShowFolders,
             ShowHiddenFiles,
             _requiredExtentionFilters.Select(filter => filter.FileType.Extension),
+            _disallowedExtentionFilters.Select(filter => filter.FileType.Extension),
             _requiredTagFilters.Where(tag => tag.Id.HasValue).Select(tag => tag.Id!.Value),
             _disallowedTagFilters.Where(tag => tag.Id.HasValue).Select(tag => tag.Id!.Value),
             reloadCurrentFolder);

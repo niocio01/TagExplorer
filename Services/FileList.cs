@@ -13,6 +13,7 @@ public readonly record struct FileListFilterOptions(
     bool ShowHiddenFiles,
     bool CurrentItemsExcludeHidden,
     IReadOnlySet<string> RequiredExtensions,
+    IReadOnlySet<string> DisallowedExtensions,
     IReadOnlySet<int> RequiredTagIds,
     IReadOnlySet<int> DisallowedTagIds);
 
@@ -70,11 +71,11 @@ public static class FileList
         return true;
     }
 
-    public static void RebuildRequiredExtensions(HashSet<string> target, IEnumerable<string> requiredExtensions)
+    public static void RebuildExtensions(HashSet<string> target, IEnumerable<string> extensions)
     {
         target.Clear();
 
-        foreach (var extension in requiredExtensions)
+        foreach (var extension in extensions)
         {
             if (string.IsNullOrWhiteSpace(extension))
             {
@@ -110,17 +111,8 @@ public static class FileList
         }
 
 
-        if (!MatchesExtensionFilter(item, options.RequiredExtensions))
-        {
-            return false;
-        }
-
-        if (options.RequiredTagIds.Count == 0 && options.DisallowedTagIds.Count == 0)
-        {
-            return true;
-        }
-
-        return true;
+        // Tag filters are applied by DataCachingService.GetCandidates, not here.
+        return MatchesExtensionFilter(item, options.RequiredExtensions, options.DisallowedExtensions);
     }
 
     /// <summary>
@@ -209,14 +201,17 @@ public static class FileList
         }
     }
 
-    private static bool MatchesExtensionFilter(ExplorerItem item, IReadOnlySet<string> requiredExtensions)
+    private static bool MatchesExtensionFilter(
+        ExplorerItem item,
+        IReadOnlySet<string> requiredExtensions,
+        IReadOnlySet<string> disallowedExtensions)
     {
-        if (requiredExtensions.Count == 0)
-            return true;
-
         if (item is not File fileItem)
+            return requiredExtensions.Count == 0;
+
+        if (disallowedExtensions.Contains(fileItem.Extension))
             return false;
 
-        return requiredExtensions.Contains(fileItem.Extension);
+        return requiredExtensions.Count == 0 || requiredExtensions.Contains(fileItem.Extension);
     }
 }

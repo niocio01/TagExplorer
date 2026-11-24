@@ -318,7 +318,7 @@ public class ItemSearchService
         {
             var candidates = _cachedItems;
 
-            candidates = _dataCachingService.GetCandidates(filterCriteria.CurrentFolderPath, filterCriteria.requiredTagIds, filterCriteria.disallowedTagIds, filterCriteria.requiredExtensions);
+            candidates = _dataCachingService.GetCandidates(filterCriteria.CurrentFolderPath, filterCriteria.requiredTagIds, filterCriteria.disallowedTagIds, filterCriteria.requiredExtensions, filterCriteria.disallowedExtensions);
 
             // candidates = FilterByHiddenItems(candidates, filterCriteria.IncludeHidden, cancellationToken);
             // candidates = FilterBySubItems(candidates, filterCriteria.IncludeSubItems, cancellationToken);
@@ -454,6 +454,7 @@ public readonly record struct FilterCriteria(
     IReadOnlySet<int> requiredTagIds,
     IReadOnlySet<int> disallowedTagIds,
     IReadOnlySet<string> requiredExtensions,
+    IReadOnlySet<string> disallowedExtensions,
     bool IncludeHidden = true,
     bool IncludeSubItems = true,
     bool IncludeVirtualTagedItems = true,

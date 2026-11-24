@@ -236,7 +236,8 @@ public class DataCachingService
         string? rootPath,
         IReadOnlySet<int> requiredTagIds,
         IReadOnlySet<int> disallowedTagIds,
-        IReadOnlySet<string> requiredExtensions)
+        IReadOnlySet<string> requiredExtensions,
+        IReadOnlySet<string> disallowedExtensions)
     {
         // Take consistent snapshots under the lock; the set operations below run without it.
         ItemIndex items;
@@ -291,6 +292,15 @@ public class DataCachingService
             }
 
             candidates.IntersectWith(itemsWithAnyRequiredExtension);
+        }
+
+        foreach (var extension in disallowedExtensions)
+        {
+            var normalizedExtension = extension.TrimStart('.').ToLowerInvariant();
+            if (items.ItemsByExtension.TryGetValue(normalizedExtension, out var itemsWithExtension))
+            {
+                candidates.ExceptWith(itemsWithExtension);
+            }
         }
 
         return candidates.ToList();
