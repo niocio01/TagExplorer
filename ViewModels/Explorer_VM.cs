@@ -103,6 +103,9 @@ public partial class Explorer_VM : ObservableObject
             extentionButton_VM.FilterTypeChanged += ExtentionFilterTypeChanged;
         }
 
+        // The file list keeps its own copy of the toolbar toggles; sync it before the first listing.
+        ApplyFileListFilters(reloadCurrentFolder: false);
+
         SetCurrentPathToHome(baseFolders);
         AddToHistory(Breadcrumbs.ToList());
     }
