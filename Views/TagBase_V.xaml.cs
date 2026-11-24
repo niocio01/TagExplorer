@@ -53,6 +53,7 @@ public partial class TagBase_V : UserControl
             new PropertyMetadata(null));
 
     private Point _dragStartPoint;
+    private bool _isDragPending;
     private bool _wasDragged;
 
     public ICommand? ClickCommand
@@ -99,18 +100,27 @@ public partial class TagBase_V : UserControl
     private void Grid_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         _dragStartPoint = e.GetPosition(this);
+        _isDragPending = true;
         _wasDragged = false;
+    }
+
+    private void Grid_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        _isDragPending = false;
     }
 
     private void Grid_PreviewMouseMove(object sender, MouseEventArgs e)
     {
-        if (!IsPickUpable)
+        // Only start a drag for a press that began on this chip. After DoDragDrop returns, WPF can
+        // still report the left button as pressed, which must not start a second drag.
+        if (!IsPickUpable || !_isDragPending || TagDragState.IsDragging)
         {
             return;
         }
 
         if (e.LeftButton != MouseButtonState.Pressed)
         {
+            _isDragPending = false;
             return;
         }
 
@@ -122,6 +132,8 @@ public partial class TagBase_V : UserControl
         {
             return;
         }
+
+        _isDragPending = false;
 
         if (DataContext is FilterTag filterTag)
         {
