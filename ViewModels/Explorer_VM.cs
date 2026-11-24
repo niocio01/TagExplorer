@@ -14,6 +14,7 @@ namespace TagExplorer.ViewModels;
 public partial class Explorer_VM : ObservableObject
 {
     public const int HistoryLength = 20;
+    private const string HomeBreadcrumbName = "BaseFolders";
 
     [ObservableProperty]
     private FileList_VM _fileList;
@@ -165,7 +166,7 @@ public partial class Explorer_VM : ObservableObject
 
         var currentBreadcrumb = Breadcrumbs[Breadcrumbs.Count - 1];
 
-        if (currentBreadcrumb.Name == "BaseFolders")
+        if (IsHomeBreadcrumb(currentBreadcrumb))
         {
             Breadcrumbs.Clear();
             Breadcrumbs.Add(folder);
@@ -182,11 +183,13 @@ public partial class Explorer_VM : ObservableObject
         AddToHistory(Breadcrumbs.ToList());
     }
 
+    private static bool IsHomeBreadcrumb(Folder folder) => folder.Name == HomeBreadcrumbName;
+
     private void SetCurrentPathToHome(IReadOnlyList<BaseFolder>? baseFolders = null)
     {
         Breadcrumbs =
         [
-            new Folder("BaseFolders", "BaseFolders", false)
+            new Folder(HomeBreadcrumbName, HomeBreadcrumbName, false)
         ];
 
         var folders = baseFolders ?? _db?.BaseFolders.AsNoTracking().ToList() ?? [];
@@ -273,7 +276,14 @@ public partial class Explorer_VM : ObservableObject
     [RelayCommand]
     public void BreadcrumbHomeClicked()
     {
+        var isAlreadyHome = Breadcrumbs.Count > 0 && IsHomeBreadcrumb(Breadcrumbs[Breadcrumbs.Count - 1]);
+
         SetCurrentPathToHome();
+
+        if (!isAlreadyHome)
+        {
+            AddToHistory(Breadcrumbs.ToList());
+        }
     }
 
     [RelayCommand]
@@ -283,12 +293,7 @@ public partial class Explorer_VM : ObservableObject
             return;
 
         CurrentHistoryPosition--;
-        Breadcrumbs = new ObservableCollection<Folder>(BreadcrumbsHistory[CurrentHistoryPosition]);
-
-        if (Breadcrumbs.Count > 0)
-        {
-            SetCurrentFolderItems(Breadcrumbs[Breadcrumbs.Count - 1]);
-        }
+        ShowHistoryEntry(BreadcrumbsHistory[CurrentHistoryPosition]);
     }
 
     [RelayCommand]
@@ -298,12 +303,28 @@ public partial class Explorer_VM : ObservableObject
             return;
 
         CurrentHistoryPosition++;
-        Breadcrumbs = new ObservableCollection<Folder>(BreadcrumbsHistory[CurrentHistoryPosition]);
+        ShowHistoryEntry(BreadcrumbsHistory[CurrentHistoryPosition]);
+    }
 
-        if (Breadcrumbs.Count > 0)
+    // The home entry is a placeholder without a real path, so it is rebuilt from the base folders
+    // instead of being browsed like a folder.
+    private void ShowHistoryEntry(List<Folder> breadcrumbs)
+    {
+        if (breadcrumbs.Count == 0)
         {
-            SetCurrentFolderItems(Breadcrumbs[Breadcrumbs.Count - 1]);
+            return;
         }
+
+        var currentFolder = breadcrumbs[breadcrumbs.Count - 1];
+
+        if (IsHomeBreadcrumb(currentFolder))
+        {
+            SetCurrentPathToHome();
+            return;
+        }
+
+        Breadcrumbs = new ObservableCollection<Folder>(breadcrumbs);
+        SetCurrentFolderItems(currentFolder);
     }
 
     [RelayCommand]
