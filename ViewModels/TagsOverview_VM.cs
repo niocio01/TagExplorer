@@ -6,6 +6,7 @@ using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.Windows;
 using TagExplorer.Data;
+using TagExplorer.Services;
 using TagExplorer.Views;
 using Color = TagExplorer.Data.Color;
 
@@ -74,6 +75,7 @@ public partial class TagsOverview_VM : ObservableValidator
     public bool EditEnabled => SomeTagIsSelected || NewTagEdit;
 
     private AppDbContext _db;
+    private readonly DataCachingService? _dataCachingService;
 
     public TagsOverview_VM()
     {
@@ -81,9 +83,10 @@ public partial class TagsOverview_VM : ObservableValidator
             throw new InvalidOperationException("Use DI to create ViewModel at runtime.");
     }
 
-    public TagsOverview_VM(AppDbContext db)
+    public TagsOverview_VM(AppDbContext db, DataCachingService dataCachingService)
     {
         _db = db;
+        _dataCachingService = dataCachingService;
 
         DefaultTagColor = _db.Colors.First(c => c.Name == "Blue");
 
@@ -151,8 +154,6 @@ public partial class TagsOverview_VM : ObservableValidator
 
         SetPrivateTagProps();
 
-        ColorButtonVMs.First(vm => vm.Color == SelectedTag.Color).SelectColor();
-
         ChildrenVMs.Clear();
         if (SelectedTag.Children is null)
         {
@@ -171,9 +172,31 @@ public partial class TagsOverview_VM : ObservableValidator
         Description = SelectedTag?.Description;
         AliasString = SelectedTag?.Aliases == null ? "" : string.Join("\r\n", SelectedTag.Aliases);
         ShortCode = SelectedTag?.ShortCode;
-        IconName = DefaultIconString;
-        Color = DefaultTagColor;
-        ColorButtonVMs.First(vm => vm.Color == DefaultTagColor).SelectColor();
+        // Keep the selected tag's own icon and colour, so saving other changes doesn't reset them.
+        IconName = SelectedTag?.IconName ?? DefaultIconString;
+        Color = SelectedTag?.Color ?? DefaultTagColor;
+        ColorButtonVMs.First(vm => vm.Color == Color).SelectColor();
+    }
+
+    private void ClearEditor()
+    {
+        SelectedTagVM = null;
+        NewTagEdit = false;
+        Name = null;
+        Description = null;
+        AliasString = null;
+        ShortCode = null;
+        IconName = null;
+        Color = null;
+        ChildrenVMs.Clear();
+
+        foreach (ColorButton_VM colorButtonVM in ColorButtonVMs)
+        {
+            colorButtonVM.IsSelected = false;
+        }
+
+        // Setting the required fields to null must not show validation errors on the empty editor.
+        ClearErrors();
     }
 
     [RelayCommand]
@@ -198,8 +221,7 @@ public partial class TagsOverview_VM : ObservableValidator
 
         if (NewTagEdit)
         {
-            List<string>? aliases = AliasString?.Split("\r\n").ToList();
-            TagDTO newDTOTag = new(Name!, Color!, Description, aliases, IconName!, shortCode: ShortCode);
+            TagDTO newDTOTag = new(Name!, Color!, Description, ParseAliases(), IconName!, shortCode: ShortCode);
             _db.Tags.Add(newDTOTag);
             _db.SaveChanges();
 
@@ -212,7 +234,7 @@ public partial class TagsOverview_VM : ObservableValidator
         {
             SelectedTag!.Name = Name!;
             SelectedTag.Description = Description;
-            SelectedTag.Aliases = AliasString?.Split("\r\n").ToList();
+            SelectedTag.Aliases = ParseAliases();
             SelectedTag.IconName = IconName;
             SelectedTag.ShortCode = ShortCode;
             SelectedTag.Color = Color;
@@ -223,6 +245,16 @@ public partial class TagsOverview_VM : ObservableValidator
         NewTagEdit = false;
     }
 
+    // One alias per line; blank lines are ignored, and no aliases are stored as null instead of [""].
+    private List<string>? ParseAliases()
+    {
+        List<string>? aliases = AliasString?
+            .Split(["\r\n", "\n"], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .ToList();
+
+        return aliases is { Count: > 0 } ? aliases : null;
+    }
+
     [RelayCommand]
     public void DeleteTag()
     {
@@ -231,17 +263,45 @@ public partial class TagsOverview_VM : ObservableValidator
         if (SelectedTag.IsSystemTag)
             return;
 
-        TagVMs.Remove(TagVMs.First(vm => vm.Tag == SelectedTag));
-        _db.Tags.Remove(SelectedTag);
+        TagDTO tag = SelectedTag;
+        int assignedItemCount = _db.TagAssignments.Count(a => a.TagId == tag.Id && !a.IsArchived && a.Enabled);
+
+        string message = assignedItemCount == 0
+            ? $"Delete the tag \"{tag.Name}\"?"
+            : $"Delete the tag \"{tag.Name}\"? It is assigned to {assignedItemCount} item(s); it will be removed from them.";
+
+        MessageBoxResult result = MessageBox.Show(message, "Delete tag", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
+        if (result != MessageBoxResult.Yes)
+            return;
+
+        RemoveAssignmentsOfTag(tag.Id);
+
+        TagVMs.Remove(TagVMs.First(vm => vm.Tag == tag));
+        _db.Tags.Remove(tag);
         _db.SaveChanges();
 
-        SelectedTagVM = null;
-        Name = null;
-        Description = null;
-        AliasString = null;
-        ShortCode = null;
-        IconName = null;
-        Color = null;
+        ClearEditor();
+    }
+
+    // There is no foreign key from TagAssignments to Tags, so assignments of a deleted tag must be removed here.
+    private void RemoveAssignmentsOfTag(int tagId)
+    {
+        // Goes through the cache so badges and filters update; this archives the assignments.
+        if (_dataCachingService is not null)
+        {
+            foreach (var application in _dataCachingService.GetTagApplicationsForTag(tagId))
+            {
+                _dataCachingService.RemoveTagApplication(application);
+            }
+        }
+
+        // Assignments whose item isn't in the cache (e.g. a missing file) are archived directly.
+        _db.TagAssignments
+            .Where(a => a.TagId == tagId && !a.IsArchived)
+            .ExecuteUpdate(setters => setters
+                .SetProperty(a => a.IsArchived, true)
+                .SetProperty(a => a.Enabled, false)
+                .SetProperty(a => a.UpdatedAtUtc, DateTime.UtcNow));
     }
 
     [RelayCommand]

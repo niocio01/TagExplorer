@@ -132,7 +132,7 @@
                         Margin="0 5 0 0"
                         VerticalAlignment="Center"
                         materialDesign:HintAssist.Hint="Description"
-                        Text="{Binding Path=Description}"
+                        Text="{Binding Path=Description, UpdateSourceTrigger=PropertyChanged}"
                         d:Text="Tag Description"
                         Style="{StaticResource MaterialDesignFloatingHintTextBox}"
                     />
@@ -140,7 +140,7 @@
                     <TextBox
                         Margin="0 15 0 0"
                         materialDesign:HintAssist.Hint="Aliases"
-                        Text="{Binding Path=AliasString}"
+                        Text="{Binding Path=AliasString, UpdateSourceTrigger=PropertyChanged}"
                         AcceptsReturn="True"
                         Style="{StaticResource MaterialDesignOutlinedTextBox}"
                         TextWrapping="Wrap"
