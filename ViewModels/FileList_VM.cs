@@ -198,25 +198,40 @@ public partial class FileList_VM : ObservableObject
         FolderDoubleClicked?.Invoke(this, folder);
     }
 
-    public bool TryAddDroppedTagToItem(ExplorerItem targetItem, object? dropData)
+    public bool TryAddDroppedTagToItem(ExplorerItem targetItem, object? dropData, AssignmentMode mode = AssignmentMode.OnlyThisItem)
     {
-        return dropData switch
+        Tag? tag = dropData switch
         {
-            FilterTag filterTag => AddTagToItem(targetItem, filterTag.Tag),
-            Tag tag => AddTagToItem(targetItem, tag),
-            Tag_VM tagVm => AddTagToItem(targetItem, _dataCachingService?.GetTag(tagVm.Tag.Id) ?? new Tag(tagVm.Tag)),
-            _ => false
+            FilterTag filterTag => filterTag.Tag,
+            Tag droppedTag => droppedTag,
+            Tag_VM tagVm => _dataCachingService?.GetTag(tagVm.Tag.Id) ?? new Tag(tagVm.Tag),
+            _ => null
         };
+
+        if (tag is null || _tagAssignmentService is null || _dataCachingService is null)
+        {
+            return false;
+        }
+
+        // Assigning the tag in another kind replaces an existing assignment of it on this item.
+        var childTagsToDelete = ChildTagCleanup.AskWhichToDelete(_dataCachingService, _tagAssignmentService.GetAssignmentsReplacedBy(targetItem, tag, mode));
+        if (childTagsToDelete is null)
+        {
+            return false;
+        }
+
+        var added = _tagAssignmentService.AssignTag(targetItem, tag, mode);
+        if (added)
+        {
+            ChildTagCleanup.Delete(_dataCachingService, childTagsToDelete);
+        }
+
+        return added;
     }
 
     partial void OnSelectedItemChanged(ExplorerItem? value)
     {
         SelectedItemChanged?.Invoke(this, value);
-    }
-
-    private bool AddTagToItem(ExplorerItem item, Tag tag)
-    {
-        return _tagAssignmentService?.AssignManualTag(item, tag) == true;
     }
 
     private async Task SetCurrentFolderItemsAsync(Folder newCurrentFolder)
@@ -559,8 +574,8 @@ public partial class FileList_VM : ObservableObject
 
         var orderedDefinitions = tagApplications.Select(a =>
             new CompactTagDefinition { Id = a.Tag.Id.Value, Name = a.Tag.Name, ColorHex = a.Tag.Color?.HexCode, ShortCode = a.Tag.ShortCode, IsVirtual = a.IsVirtual })
-        .OrderBy(a => !a.IsVirtual)
-        .OrderBy(d => d.Name, StringComparer.OrdinalIgnoreCase)
+        .OrderBy(a => a.IsVirtual)
+        .ThenBy(d => d.Name, StringComparer.OrdinalIgnoreCase)
         .ToList();
 
         var visible = orderedDefinitions

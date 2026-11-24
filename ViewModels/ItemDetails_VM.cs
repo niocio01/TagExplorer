@@ -125,13 +125,22 @@ public partial class ItemDetails_VM : ObservableObject
 
     public bool TryAddDroppedTag(object? dropData)
     {
-        return dropData switch
+        var mode = AssignmentMode.OnlyThisItem;
+        if (dropData is TagDropRequest request)
         {
-            FilterTag filterTag => AddTagToSelectedItem(filterTag.Tag),
-            Tag Tag => AddTagToSelectedItem(Tag),
-            Tag_VM tagVm => AddTagToSelectedItem(new Tag(tagVm.Tag)),
-            _ => false
+            dropData = request.Payload;
+            mode = request.Mode;
+        }
+
+        Tag? tag = dropData switch
+        {
+            FilterTag filterTag => filterTag.Tag,
+            Tag droppedTag => droppedTag,
+            Tag_VM tagVm => _dcs?.GetTag(tagVm.Tag.Id) ?? new Tag(tagVm.Tag),
+            _ => null
         };
+
+        return tag is not null && AddTagToSelectedItem(tag, mode);
     }
 
     [RelayCommand]
@@ -143,24 +152,85 @@ public partial class ItemDetails_VM : ObservableObject
     [RelayCommand]
     private void HandleRemoveTag(object? tagData)
     {
-        if (tagData is not AppliedTag appliedTag)
+        if (tagData is not AppliedTag { CanRemove: true } appliedTag)
         {
             return;
         }
 
-        if (_tagAssignmentService?.RemoveManualTagAssignment(appliedTag.Application.Assignment) != true)
+        // Removing an assignment that reaches other items changes them too, so ask first.
+        RemoveAssignment(appliedTag, confirm: AssignmentModes.ReachesOtherItems(appliedTag.Assignment));
+    }
+
+    private void RemoveAssignment(AppliedTag appliedTag, bool confirm)
+    {
+        if (_tagAssignmentService is null || _dcs is null)
         {
             return;
         }
+
+        if (confirm)
+        {
+            var result = MessageBox.Show(
+                $"Remove the tag \"{appliedTag.Name}\" from \"{appliedTag.SourcePath}\"? All items that get it from there lose it too.",
+                "Remove tag", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
+            if (result != MessageBoxResult.Yes)
+            {
+                return;
+            }
+        }
+
+        var childTagsToDelete = ChildTagCleanup.AskWhichToDelete(_dcs, [appliedTag.Assignment]);
+        if (childTagsToDelete is null)
+        {
+            return;
+        }
+
+        _tagAssignmentService.RemoveAssignment(appliedTag.Assignment);
+        ChildTagCleanup.Delete(_dcs, childTagsToDelete);
 
         ReloadSelectedItemTags();
     }
 
-    private bool AddTagToSelectedItem(Tag tag)
+    private void ChangeMode(AppliedTag appliedTag, AssignmentMode mode)
     {
-        var added = _tagAssignmentService?.AssignManualTag(SelectedItem, tag) == true;
+        if (_tagAssignmentService is null || _dcs is null || AssignmentModes.Of(appliedTag.Assignment) == mode)
+        {
+            return;
+        }
+
+        // Changing the kind replaces the assignment; a replaced child-tag rule leaves its child tags behind.
+        var childTagsToDelete = ChildTagCleanup.AskWhichToDelete(_dcs, [appliedTag.Assignment]);
+        if (childTagsToDelete is null)
+        {
+            return;
+        }
+
+        // Only direct tags and rules offer kinds, and both sit on the selected item.
+        if (_tagAssignmentService.ChangeMode(appliedTag.Assignment, mode, SelectedItem))
+        {
+            ChildTagCleanup.Delete(_dcs, childTagsToDelete);
+            ReloadSelectedItemTags();
+        }
+    }
+
+    private bool AddTagToSelectedItem(Tag tag, AssignmentMode mode)
+    {
+        if (SelectedItem is null || _tagAssignmentService is null || _dcs is null)
+        {
+            return false;
+        }
+
+        // Assigning the tag in another kind replaces an existing assignment of it on this item.
+        var childTagsToDelete = ChildTagCleanup.AskWhichToDelete(_dcs, _tagAssignmentService.GetAssignmentsReplacedBy(SelectedItem, tag, mode));
+        if (childTagsToDelete is null)
+        {
+            return false;
+        }
+
+        var added = _tagAssignmentService.AssignTag(SelectedItem, tag, mode);
         if (added)
         {
+            ChildTagCleanup.Delete(_dcs, childTagsToDelete);
             ReloadSelectedItemTags();
         }
 
@@ -184,12 +254,62 @@ public partial class ItemDetails_VM : ObservableObject
             return;
         }
 
+        if (_dcs is null)
+        {
+            return;
+        }
+
         var tagApplications = _dcs.GetTagApplicationsForItem(SelectedItem);
 
-        foreach (var application in tagApplications)
+        // Direct tags first, then rules on this folder, then tags inherited from folders above.
+        foreach (var application in tagApplications.Where(app => !app.IsVirtual))
         {
-            SelectedItemTags.Add(new AppliedTag(application));
+            SelectedItemTags.Add(CreateAppliedTag(application.Tag, application.Assignment, AppliedTagKind.Direct));
         }
+
+        if (SelectedItem is Folder folder)
+        {
+            foreach (var rule in _dcs.GetRulesOnFolder(folder.Path))
+            {
+                if (AssignmentModes.DisplayTagId(rule) is int tagId && _dcs.GetTag(tagId) is Tag ruleTag)
+                {
+                    SelectedItemTags.Add(CreateAppliedTag(ruleTag, rule, AppliedTagKind.Rule));
+                }
+            }
+        }
+
+        foreach (var application in tagApplications.Where(app => app.IsVirtual).OrderBy(app => app.Tag.Name, StringComparer.OrdinalIgnoreCase))
+        {
+            SelectedItemTags.Add(CreateAppliedTag(application.Tag, application.Assignment, AppliedTagKind.Virtual));
+        }
+    }
+
+    private AppliedTag CreateAppliedTag(Tag tag, TagAssignment assignment, AppliedTagKind kind)
+    {
+        AppliedTag? appliedTag = null;
+
+        // Only assignments on folders have more than one kind to choose from.
+        var modeOptions = kind != AppliedTagKind.Virtual && assignment.TargetType == TargetType.Folder
+            ? AssignmentModes.All
+                .Select(mode => new AssignmentModeOption(
+                    AssignmentModes.DisplayName(mode),
+                    AssignmentModes.Of(assignment) == mode,
+                    new RelayCommand(() => ChangeMode(appliedTag!, mode))))
+                .ToList()
+            : [];
+
+        appliedTag = new AppliedTag
+        {
+            Tag = tag,
+            Assignment = assignment,
+            Kind = kind,
+            ModeOptions = modeOptions,
+            GoToSourceCommand = new RelayCommand(() =>
+                WeakReferenceMessenger.Default.Send(new NavigateToFolderMessage(assignment.TargetPath))),
+            RemoveFromSourceCommand = new RelayCommand(() => RemoveAssignment(appliedTag!, confirm: true))
+        };
+
+        return appliedTag;
     }
 
     private string GetDateDisplay(bool isCreated)

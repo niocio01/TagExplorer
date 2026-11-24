@@ -9,6 +9,9 @@
              mc:Ignorable="d"
              d:DesignHeight="150"
              d:DesignWidth="300">
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+    </UserControl.Resources>
     <Expander
         HorizontalAlignment="Stretch"
         materialDesign:ExpanderAssist.HorizontalHeaderPadding="0, 0, 0, 0"
@@ -59,12 +62,46 @@
                         <local:TagBase_V
                             DataContext="{Binding}"
                             IsPickUpable="False">
+                            <local:TagBase_V.Style>
+                                <Style TargetType="local:TagBase_V">
+                                    <Style.Triggers>
+                                        <!-- Virtual tags come from a folder above, rules tag only the subfolders. -->
+                                        <DataTrigger Binding="{Binding IsVirtual}" Value="True">
+                                            <Setter Property="Opacity" Value="0.5" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding IsRule}" Value="True">
+                                            <Setter Property="Opacity" Value="0.75" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </local:TagBase_V.Style>
                             <local:TagBase_V.ContextMenu>
                                 <ContextMenu>
                                     <MenuItem
                                         Header="Remove tag"
+                                        Visibility="{Binding CanRemove, Converter={StaticResource BoolToVisibility}}"
                                         Command="{Binding RemoveTagCommand, Source={x:Reference Root}}"
                                         CommandParameter="{Binding}" />
+                                    <MenuItem
+                                        Header="Kind"
+                                        Visibility="{Binding CanChangeMode, Converter={StaticResource BoolToVisibility}}"
+                                        ItemsSource="{Binding ModeOptions}">
+                                        <MenuItem.ItemContainerStyle>
+                                            <Style TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}">
+                                                <Setter Property="Header" Value="{Binding Header}" />
+                                                <Setter Property="IsChecked" Value="{Binding IsCurrent, Mode=OneWay}" />
+                                                <Setter Property="Command" Value="{Binding Command}" />
+                                            </Style>
+                                        </MenuItem.ItemContainerStyle>
+                                    </MenuItem>
+                                    <MenuItem
+                                        Header="{Binding GoToSourceHeader}"
+                                        Visibility="{Binding IsVirtual, Converter={StaticResource BoolToVisibility}}"
+                                        Command="{Binding GoToSourceCommand}" />
+                                    <MenuItem
+                                        Header="{Binding RemoveFromSourceHeader}"
+                                        Visibility="{Binding IsVirtual, Converter={StaticResource BoolToVisibility}}"
+                                        Command="{Binding RemoveFromSourceCommand}" />
                                 </ContextMenu>
                             </local:TagBase_V.ContextMenu>
                         </local:TagBase_V>

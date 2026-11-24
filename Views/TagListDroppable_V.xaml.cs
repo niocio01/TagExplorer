@@ -152,7 +152,26 @@ public partial class TagListDroppable_V : UserControl
 
     private void TagsDropZone_Drop(object sender, DragEventArgs e)
     {
-        var payload = e.Data.GetData(typeof(FilterTag)) ?? e.Data.GetData(typeof(Tag_VM));
+        object? payload = e.Data.GetData(typeof(FilterTag)) ?? e.Data.GetData(typeof(Tag_VM));
+
+        // Shift+drop on a folder: pick how the tag is assigned.
+        if (payload is not null && SelectedItem is Folder && AssignmentModeMenu.IsShiftHeld(e))
+        {
+            var droppedPayload = payload;
+            AssignmentModeMenu.ShowAfterDrop(TagsDropZone, AssignmentModeMenu.GetTagName(payload), mode =>
+            {
+                var request = new TagDropRequest(droppedPayload, mode);
+                if (TagDroppedCommand?.CanExecute(request) == true)
+                {
+                    TagDroppedCommand.Execute(request);
+                }
+            });
+
+            e.Effects = DragDropEffects.Copy;
+            RestoreDropHintVisibility();
+            e.Handled = true;
+            return;
+        }
 
         if (payload is not null && TagDroppedCommand?.CanExecute(payload) == true)
         {

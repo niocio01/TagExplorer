@@ -25,6 +25,7 @@
                 <Setter Property="AllowDrop" Value="True" />
                 <EventSetter Event="MouseDoubleClick" Handler="ListBoxItem_MouseDoubleClick"/>
                 <EventSetter Event="Drop" Handler="ListBoxItem_Drop"/>
+                <EventSetter Event="DragOver" Handler="ListBoxItem_DragOver"/>
 
                 <EventSetter Event="DragEnter" Handler="Item_DragEnter"/>
                 <EventSetter Event="DragLeave" Handler="Item_DragLeave"/>

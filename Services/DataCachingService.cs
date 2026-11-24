@@ -32,6 +32,16 @@ public class DataCachingService
     private readonly Dictionary<string, HashSet<TagApplication>> _tagApplicationsByPath = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<int, HashSet<TagApplication>> _tagApplicationsByTagId = [];
 
+    // Tags reaching items through assignments on folders above them (virtual tags). Built on demand from the
+    // assignments and items, and cleared whenever either changes (InvalidateInheritedCaches).
+    private Dictionary<string, List<TagAssignment>>? _assignmentsReachingOtherItemsByPath;
+    private readonly Dictionary<string, List<TagApplication>> _inheritedApplicationsByPath = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<int, HashSet<ExplorerItem>> _inheritedItemsByTagId = [];
+
+    private const int MaxTagNameLength = 50;
+    private const int MaxTagDescriptionLength = 200;
+    private const string AutoChildTagDescriptionPrefix = "Auto: ";
+
     /// <summary>
     /// The published item cache. The list is never changed after publishing.
     /// </summary>
@@ -67,7 +77,7 @@ public class DataCachingService
         _tagCache.AddRange(cachedTagDtos.Select(dto => new Tag(dto)));
         _tagAssignmentCache.AddRange(
             _db.TagAssignments.AsNoTracking()
-            .Where(a => !a.IsArchived && a.Enabled && a.TagId != null)
+            .Where(a => !a.IsArchived && a.Enabled && (a.TagId != null || a.AutoRuleParentTagId != null))
             .ToList());
     }
 
@@ -119,12 +129,52 @@ public class DataCachingService
             }
         }
 
+        RunOnUiThread(EnsureChildTagsOfAllRules);
+
         WeakReferenceMessenger.Default.Send(new TagApplicationsChangedMessage());
     }
 
-    private void ApplyAssignment(TagAssignment assignment)
+    // Creates the tags of subfolders added since the rules were made. Uses the DbContext, so it runs on the UI thread.
+    private void EnsureChildTagsOfAllRules()
     {
-        var item = FindCachedItemByTargetPath(assignment.TargetPath);
+        List<TagAssignment> rules;
+        lock (_sync)
+        {
+            rules = _tagAssignmentCache.Where(a => a.Kind == AssignmentKind.AutoDirectChildrenAsChildTag).ToList();
+        }
+
+        foreach (var rule in rules)
+        {
+            EnsureChildTags(rule);
+        }
+    }
+
+    private void RunOnUiThread(Action action)
+    {
+        var dispatcher = System.Windows.Application.Current?.Dispatcher;
+        if (dispatcher is not null && !dispatcher.CheckAccess())
+        {
+            // Not awaited, so log failures here instead of losing them.
+            _ = dispatcher.InvokeAsync(action).Task.ContinueWith(
+                task => _logger?.LogError(task.Exception, "Background UI work failed."),
+                TaskContinuationOptions.OnlyOnFaulted);
+            return;
+        }
+
+        action();
+    }
+
+    // Adds the application of an assignment to its own target. Rules that only tag items below their
+    // target (direct subfolders, child tags) have none; they are resolved by GetInheritedApplications.
+    private void ApplyAssignment(TagAssignment assignment, ExplorerItem? targetItem = null)
+    {
+        if (!AssignmentModes.AppliesToTarget(assignment))
+        {
+            return;
+        }
+
+        // Items outside the cache (e.g. base folders, or before the first build) are passed in by the caller.
+        var item = targetItem ?? FindCachedItemByTargetPath(assignment.TargetPath);
         if (item is null)
         {
             _logger?.LogWarning("No cached ExplorerItem found for TagAssignment with id {TagAssignmentId} and target path {TargetPath}", assignment.Id, assignment.TargetPath);
@@ -138,19 +188,193 @@ public class DataCachingService
             return;
         }
 
-        switch (assignment.Kind)
+        CacheAndIndexApplication(new TagApplication(item, tag, assignment));
+    }
+
+    private Tag? FindCachedTag(int? tagId)
+    {
+        return tagId is null ? null : _tagCache.FirstOrDefault(t => t.Id == tagId);
+    }
+
+    private Tag? FindChildTag(int parentTagId, string folderName)
+    {
+        var name = ToChildTagName(folderName);
+        return _tagCache.FirstOrDefault(t => t.Parent?.Id == parentTagId
+            && string.Equals(t.Name, name, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string ToChildTagName(string folderName)
+    {
+        return folderName.Length <= MaxTagNameLength ? folderName : folderName[..MaxTagNameLength];
+    }
+
+    private static IEnumerable<Folder> GetDirectSubfolders(ItemIndex items, string folderPath)
+    {
+        return items.ItemsByParentPath.TryGetValue(folderPath, out var children)
+            ? children.OfType<Folder>()
+            : [];
+    }
+
+    private Dictionary<string, List<TagAssignment>> GetAssignmentsReachingOtherItemsByPath()
+    {
+        if (_assignmentsReachingOtherItemsByPath is not null)
         {
-            case AssignmentKind.Manual:
-                CacheAndIndexApplication(new TagApplication(item, tag, assignment));
+            return _assignmentsReachingOtherItemsByPath;
+        }
+
+        _assignmentsReachingOtherItemsByPath = _tagAssignmentCache
+            .Where(AssignmentModes.ReachesOtherItems)
+            .GroupBy(a => a.TargetPath, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.ToList(), StringComparer.OrdinalIgnoreCase);
+
+        return _assignmentsReachingOtherItemsByPath;
+    }
+
+    private void InvalidateInheritedCaches()
+    {
+        _assignmentsReachingOtherItemsByPath = null;
+        _inheritedApplicationsByPath.Clear();
+        _inheritedItemsByTagId.Clear();
+    }
+
+    /// <summary>
+    /// The virtual tag applications of the item at the path, inherited from assignments on the folders above it.
+    /// Must be called with <see cref="_sync"/> held.
+    /// </summary>
+    private List<TagApplication> GetInheritedApplications(string path)
+    {
+        if (_inheritedApplicationsByPath.TryGetValue(path, out var cachedApplications))
+        {
+            return cachedApplications;
+        }
+
+        var applications = new List<TagApplication>();
+        var assignmentsByPath = GetAssignmentsReachingOtherItemsByPath();
+        var item = assignmentsByPath.Count > 0 ? FindCachedItemByTargetPath(path) : null;
+
+        if (item is not null)
+        {
+            // Walk up the folders; childPath is the folder (or the item) directly below the current ancestor.
+            var childPath = path;
+            var ancestorPath = Path.GetDirectoryName(path);
+            var depth = 1;
+
+            while (!string.IsNullOrEmpty(ancestorPath))
+            {
+                if (assignmentsByPath.TryGetValue(ancestorPath, out var assignments))
+                {
+                    foreach (var assignment in assignments)
+                    {
+                        AddInheritedApplications(applications, item, assignment, depth, childPath);
+                    }
+                }
+
+                childPath = ancestorPath;
+                ancestorPath = Path.GetDirectoryName(ancestorPath);
+                depth++;
+            }
+        }
+
+        _inheritedApplicationsByPath[path] = applications;
+        return applications;
+    }
+
+    private void AddInheritedApplications(List<TagApplication> applications, ExplorerItem item, TagAssignment assignment, int depth, string childPath)
+    {
+        void Add(Tag? tag)
+        {
+            if (tag?.Id is not null)
+            {
+                applications.Add(new TagApplication(item, tag, assignment));
+            }
+        }
+
+        switch (assignment.Kind, assignment.Scope)
+        {
+            case (AssignmentKind.AutoDirectChildrenAsChildTag, _) when assignment.AutoRuleParentTagId is int parentTagId:
+                // childPath is a direct subfolder of the rule's folder, unless depth 1 names a file.
+                if (depth == 1 && item is not Folder)
+                {
+                    break;
+                }
+
+                if (depth == 1)
+                {
+                    Add(FindCachedTag(parentTagId));
+                }
+
+                Add(FindChildTag(parentTagId, Path.GetFileName(childPath)));
                 break;
 
-            case AssignmentKind.AutoDirectChildrenAsChildTag:
-                // TODO: Implement this assignment kind by finding all direct children of the target item and adding them to the index with the same tag id.
+            case (AssignmentKind.Manual, ApplyScope.SelfAndAllDescendants):
+                Add(FindCachedTag(assignment.TagId));
                 break;
 
-            default:
+            case (AssignmentKind.Manual, ApplyScope.SelfAndDirectDescendants) when depth == 1:
+                Add(FindCachedTag(assignment.TagId));
+                break;
+
+            case (AssignmentKind.Manual, ApplyScope.DirectChildren) when depth == 1 && item is Folder:
+                Add(FindCachedTag(assignment.TagId));
                 break;
         }
+    }
+
+    /// <summary>
+    /// The items carrying the tag through assignments on folders above them. Must be called with <see cref="_sync"/> held.
+    /// </summary>
+    private HashSet<ExplorerItem> GetInheritedItemsWithTag(int tagId)
+    {
+        if (_inheritedItemsByTagId.TryGetValue(tagId, out var cachedItems))
+        {
+            return cachedItems;
+        }
+
+        var result = new HashSet<ExplorerItem>();
+        var tag = FindCachedTag(tagId);
+
+        foreach (var (targetPath, assignments) in GetAssignmentsReachingOtherItemsByPath())
+        {
+            foreach (var assignment in assignments)
+            {
+                switch (assignment.Kind, assignment.Scope)
+                {
+                    case (AssignmentKind.AutoDirectChildrenAsChildTag, _):
+                        if (assignment.AutoRuleParentTagId == tagId)
+                        {
+                            result.UnionWith(GetDirectSubfolders(_items, targetPath));
+                        }
+                        else if (tag?.Parent?.Id is int parentTagId && parentTagId == assignment.AutoRuleParentTagId)
+                        {
+                            foreach (var subfolder in GetDirectSubfolders(_items, targetPath)
+                                .Where(folder => string.Equals(ToChildTagName(folder.Name), tag.Name, StringComparison.OrdinalIgnoreCase)))
+                            {
+                                result.Add(subfolder);
+                                result.UnionWith(GetItemsBelow(_items, subfolder.Path));
+                            }
+                        }
+                        break;
+
+                    case (AssignmentKind.Manual, ApplyScope.SelfAndAllDescendants) when assignment.TagId == tagId:
+                        result.UnionWith(GetItemsBelow(_items, targetPath));
+                        break;
+
+                    case (AssignmentKind.Manual, ApplyScope.SelfAndDirectDescendants) when assignment.TagId == tagId:
+                        if (_items.ItemsByParentPath.TryGetValue(targetPath, out var children))
+                        {
+                            result.UnionWith(children);
+                        }
+                        break;
+
+                    case (AssignmentKind.Manual, ApplyScope.DirectChildren) when assignment.TagId == tagId:
+                        result.UnionWith(GetDirectSubfolders(_items, targetPath));
+                        break;
+                }
+            }
+        }
+
+        _inheritedItemsByTagId[tagId] = result;
+        return result;
     }
 
     private void CacheAndIndexApplication(TagApplication application)
@@ -164,6 +388,7 @@ public class DataCachingService
         }
 
         _tagApplicationCache.Add(application);
+        InvalidateInheritedCaches();
 
         var tagId = application.Tag.Id!.Value;
         if (!_tagApplicationsByTagId.TryGetValue(tagId, out var applicationsOfTag))
@@ -210,18 +435,49 @@ public class DataCachingService
         return null;
     }
 
+    /// <summary>
+    /// The direct and the virtual (inherited) tag applications of the item at the path.
+    /// </summary>
     public IReadOnlyList<TagApplication> GetTagApplicationsForPath(string path)
     {
         lock (_sync)
         {
-            return _tagApplicationsByPath.TryGetValue(path, out var applicationsForPath)
+            var applications = _tagApplicationsByPath.TryGetValue(path, out var applicationsForPath)
                 ? applicationsForPath.ToList()
                 : [];
+
+            applications.AddRange(GetInheritedApplications(path));
+            return applications;
+        }
+    }
+
+    /// <summary>
+    /// The assignments on the folder that only tag items below it (direct subfolders, child-tag rules), so they
+    /// have no application on the folder itself.
+    /// </summary>
+    public IReadOnlyList<TagAssignment> GetRulesOnFolder(string folderPath)
+    {
+        lock (_sync)
+        {
+            return GetAssignmentsReachingOtherItemsByPath().TryGetValue(folderPath, out var assignments)
+                ? assignments.Where(a => !AssignmentModes.AppliesToTarget(a)).ToList()
+                : [];
+        }
+    }
+
+    public ExplorerItem? FindCachedItem(string path)
+    {
+        lock (_sync)
+        {
+            return FindCachedItemByTargetPath(path);
         }
     }
 
     public IReadOnlyList<TagApplication> GetTagApplicationsForItem(ExplorerItem item) => GetTagApplicationsForPath(item.Path);
 
+    /// <summary>
+    /// The direct applications of the tag; virtual ones are not included.
+    /// </summary>
     public IReadOnlyList<TagApplication> GetTagApplicationsForTag(int tagId)
     {
         lock (_sync)
@@ -250,20 +506,18 @@ public class DataCachingService
 
             foreach (var tagId in requiredTagIds)
             {
-                if (!_tagApplicationsByTagId.TryGetValue(tagId, out var applicationsOfTag))
+                var itemsWithTag = GetItemsWithTag(tagId);
+                if (itemsWithTag.Count == 0)
                 {
                     return [];
                 }
 
-                itemsPerRequiredTag.Add(applicationsOfTag.Select(a => a.ExplorerItem).ToHashSet());
+                itemsPerRequiredTag.Add(itemsWithTag);
             }
 
             foreach (var tagId in disallowedTagIds)
             {
-                if (_tagApplicationsByTagId.TryGetValue(tagId, out var applicationsOfTag))
-                {
-                    itemsWithDisallowedTag.UnionWith(applicationsOfTag.Select(a => a.ExplorerItem));
-                }
+                itemsWithDisallowedTag.UnionWith(GetItemsWithTag(tagId));
             }
         }
 
@@ -306,6 +560,18 @@ public class DataCachingService
         return candidates.ToList();
     }
 
+    // Items with the tag, directly or virtually. Returns a new set; must be called with _sync held.
+    private HashSet<ExplorerItem> GetItemsWithTag(int tagId)
+    {
+        var items = new HashSet<ExplorerItem>(GetInheritedItemsWithTag(tagId));
+        if (_tagApplicationsByTagId.TryGetValue(tagId, out var applicationsOfTag))
+        {
+            items.UnionWith(applicationsOfTag.Select(a => a.ExplorerItem));
+        }
+
+        return items;
+    }
+
     public Tag? GetTag(int tagId)
     {
         lock (_sync)
@@ -328,6 +594,9 @@ public class DataCachingService
             {
                 _tagCache.Add(new Tag(dto));
             }
+
+            // A new or renamed tag can be the child tag of a rule.
+            InvalidateInheritedCaches();
         }
 
         // Outside the lock: this raises PropertyChanged, which updates bound UI.
@@ -338,92 +607,230 @@ public class DataCachingService
     }
 
     /// <summary>
-    /// Removes a deleted tag from the cache. Remove its applications first (RemoveTagApplication).
+    /// Removes a deleted tag from the cache. Remove its assignments first (RemoveAssignmentsOfTag).
     /// </summary>
     public void RemoveTag(int tagId)
     {
         lock (_sync)
         {
             _tagCache.RemoveAll(t => t.Id == tagId);
+            InvalidateInheritedCaches();
         }
 
         WeakReferenceMessenger.Default.Send(new TagsChangedMessage());
     }
 
-    public bool AddTagApplication(TagApplication application)
+    private void ArchiveAssignment(TagAssignment assignment)
     {
-        if (application is null)
-            return false;
-
-        bool isNewAssignment;
-        lock (_sync)
+        var dbAssignment = _db.TagAssignments.FirstOrDefault(ass => ass.Id == assignment.Id);
+        if (dbAssignment is not null)
         {
-            isNewAssignment = !_tagAssignmentCache.Contains(application.Assignment);
-        }
-
-        // Store a new assignment before caching it, so the cache never holds unsaved assignments.
-        if (isNewAssignment)
-        {
-            _db.TagAssignments.Add(application.Assignment);
+            dbAssignment.IsArchived = true;
+            dbAssignment.Enabled = false;
+            dbAssignment.UpdatedAtUtc = DateTime.UtcNow;
             _db.SaveChanges();
         }
-
-        lock (_sync)
-        {
-            if (isNewAssignment)
-            {
-                _tagAssignmentCache.Add(application.Assignment);
-            }
-
-            // Tags created after startup are not in the cache yet; a later rebuild needs them.
-            if (application.Tag.Id is not null && _tagCache.All(t => t.Id != application.Tag.Id))
-            {
-                _tagCache.Add(application.Tag);
-            }
-
-            CacheAndIndexApplication(application);
-        }
-
-        WeakReferenceMessenger.Default.Send(new TagApplicationsChangedMessage(application.ExplorerItem.Path));
-
-        return true;
     }
 
-    public bool RemoveTagApplication(TagApplication application)
+    /// <summary>
+    /// Saves a new assignment and caches it with its direct and virtual applications. For a child-tag rule,
+    /// the tags of its subfolders are created as well.
+    /// </summary>
+    /// <param name="targetItem">The item the assignment sits on, if known; needed for items outside the cache.</param>
+    public void AddAssignment(TagAssignment assignment, ExplorerItem? targetItem = null)
     {
-        if (application is null)
-            return false;
-
-        var assignment = application.Assignment;
-        bool isAssignmentUnused;
+        _db.TagAssignments.Add(assignment);
+        _db.SaveChanges();
 
         lock (_sync)
         {
-            RemoveApplicationFromCacheAndIndex(application);
-
-            isAssignmentUnused = !_tagApplicationCache.Any(app => app.Assignment == assignment);
-            if (isAssignmentUnused)
-            {
-                _tagAssignmentCache.Remove(assignment);
-            }
+            _tagAssignmentCache.Add(assignment);
+            InvalidateInheritedCaches();
+            ApplyAssignment(assignment, targetItem);
         }
 
-        // Archive the assignment once no application uses it anymore.
-        if (isAssignmentUnused)
+        if (assignment.Kind == AssignmentKind.AutoDirectChildrenAsChildTag)
         {
-            var dbAssignment = _db.TagAssignments.FirstOrDefault(ass => ass.Id == assignment.Id);
-            if (dbAssignment is not null)
+            EnsureChildTags(assignment);
+        }
+
+        var affectedPath = AssignmentModes.ReachesOtherItems(assignment) ? null : assignment.TargetPath;
+        WeakReferenceMessenger.Default.Send(new TagApplicationsChangedMessage(affectedPath));
+    }
+
+    /// <summary>
+    /// Removes the assignment with all its direct and virtual applications and archives it.
+    /// </summary>
+    public void RemoveAssignment(TagAssignment assignment)
+    {
+        lock (_sync)
+        {
+            foreach (var application in _tagApplicationCache.Where(app => app.Assignment == assignment).ToList())
             {
-                dbAssignment.IsArchived = true;
-                dbAssignment.Enabled = false;
-                dbAssignment.UpdatedAtUtc = DateTime.UtcNow;
+                RemoveApplicationFromCacheAndIndex(application);
+            }
+
+            _tagAssignmentCache.Remove(assignment);
+            InvalidateInheritedCaches();
+        }
+
+        ArchiveAssignment(assignment);
+
+        WeakReferenceMessenger.Default.Send(new TagApplicationsChangedMessage());
+    }
+
+    /// <summary>
+    /// Removes all assignments using the tag, as assigned tag or as parent tag of a child-tag rule.
+    /// </summary>
+    public void RemoveAssignmentsOfTag(int tagId)
+    {
+        List<TagAssignment> assignments;
+        lock (_sync)
+        {
+            assignments = _tagAssignmentCache.Where(a => a.TagId == tagId || a.AutoRuleParentTagId == tagId).ToList();
+        }
+
+        foreach (var assignment in assignments)
+        {
+            RemoveAssignment(assignment);
+        }
+    }
+
+    /// <summary>
+    /// Creates the missing child tags of a child-tag rule: one per direct subfolder, named after it.
+    /// </summary>
+    private void EnsureChildTags(TagAssignment rule)
+    {
+        if (rule.AutoRuleParentTagId is not int parentTagId)
+        {
+            return;
+        }
+
+        List<Folder> subfoldersWithoutTag;
+        lock (_sync)
+        {
+            subfoldersWithoutTag = GetDirectSubfolders(_items, rule.TargetPath)
+                .Where(folder => FindChildTag(parentTagId, folder.Name) is null)
+                .ToList();
+        }
+
+        if (subfoldersWithoutTag.Count == 0)
+        {
+            return;
+        }
+
+        var parentDto = _db.Tags.Include(t => t.Color).FirstOrDefault(t => t.Id == parentTagId);
+        if (parentDto?.Color is null)
+        {
+            _logger?.LogWarning("Parent tag {TagId} of child-tag rule {AssignmentId} not found", parentTagId, rule.Id);
+            return;
+        }
+
+        var createdDtos = new List<TagDTO>();
+        foreach (var subfolder in subfoldersWithoutTag.DistinctBy(folder => ToChildTagName(folder.Name), StringComparer.OrdinalIgnoreCase))
+        {
+            var description = AutoChildTagDescriptionPrefix + subfolder.Path;
+            var dto = new TagDTO(
+                ToChildTagName(subfolder.Name),
+                parentDto.Color,
+                description.Length <= MaxTagDescriptionLength ? description : description[..MaxTagDescriptionLength],
+                aliases: null,
+                parentDto.IconName ?? string.Empty)
+            {
+                Parent = parentDto,
+                ParentId = parentDto.Id
+            };
+
+            _db.Tags.Add(dto);
+            createdDtos.Add(dto);
+        }
+
+        _db.SaveChanges();
+
+        lock (_sync)
+        {
+            _tagCache.AddRange(createdDtos.Select(dto => new Tag(dto)));
+            InvalidateInheritedCaches();
+        }
+
+        WeakReferenceMessenger.Default.Send(new TagsChangedMessage());
+        WeakReferenceMessenger.Default.Send(new TagApplicationsChangedMessage());
+    }
+
+    /// <summary>
+    /// The ids of the tag and all tags below it (children, their children, ...), parents first.
+    /// </summary>
+    public IReadOnlyList<int> GetTagAndDescendantIds(int tagId)
+    {
+        var ids = new List<int> { tagId };
+        for (var i = 0; i < ids.Count; i++)
+        {
+            var parentId = ids[i];
+            ids.AddRange(_db.Tags.AsNoTracking().Where(t => t.ParentId == parentId).Select(t => t.Id).ToList());
+        }
+
+        return ids;
+    }
+
+    /// <summary>
+    /// Deletes the tag together with its child tags (the parent foreign key doesn't cascade) and archives all
+    /// their assignments. Badges, filters and tag lists update through the messages.
+    /// </summary>
+    public void DeleteTagWithChildren(int tagId)
+    {
+        var ids = GetTagAndDescendantIds(tagId);
+
+        // Children first, so no tag is deleted while a child still references it.
+        foreach (var id in Enumerable.Reverse(ids))
+        {
+            RemoveAssignmentsOfTag(id);
+
+            // Assignments whose item isn't in the cache (e.g. a missing file) are archived directly.
+            _db.TagAssignments
+                .Where(a => (a.TagId == id || a.AutoRuleParentTagId == id) && !a.IsArchived)
+                .ExecuteUpdate(setters => setters
+                    .SetProperty(a => a.IsArchived, true)
+                    .SetProperty(a => a.Enabled, false)
+                    .SetProperty(a => a.UpdatedAtUtc, DateTime.UtcNow));
+
+            var dto = _db.Tags.FirstOrDefault(t => t.Id == id);
+            if (dto is not null)
+            {
+                _db.Tags.Remove(dto);
                 _db.SaveChanges();
             }
         }
 
-        WeakReferenceMessenger.Default.Send(new TagApplicationsChangedMessage(application.ExplorerItem.Path));
+        lock (_sync)
+        {
+            _tagCache.RemoveAll(t => t.Id is int id && ids.Contains(id));
+            InvalidateInheritedCaches();
+        }
 
-        return true;
+        WeakReferenceMessenger.Default.Send(new TagsChangedMessage());
+        WeakReferenceMessenger.Default.Send(new TagApplicationsChangedMessage());
+    }
+
+    /// <summary>
+    /// The child tags a rule created (by their "Auto: &lt;rule folder&gt;\..." description) that no assignment uses directly.
+    /// </summary>
+    public IReadOnlyList<Tag> GetUnusedChildTagsOfRule(TagAssignment rule)
+    {
+        if (rule.AutoRuleParentTagId is not int parentTagId)
+        {
+            return [];
+        }
+
+        var descriptionPrefix = AutoChildTagDescriptionPrefix + rule.TargetPath + Path.DirectorySeparatorChar;
+
+        lock (_sync)
+        {
+            return _tagCache
+                .Where(t => t.Parent?.Id == parentTagId
+                    && t.Description?.StartsWith(descriptionPrefix, StringComparison.OrdinalIgnoreCase) == true
+                    && _tagAssignmentCache.All(a => a.TagId != t.Id && a.AutoRuleParentTagId != t.Id))
+                .ToList();
+        }
     }
 
     private void RemoveApplicationFromCacheAndIndex(TagApplication application)
@@ -449,6 +856,7 @@ public class DataCachingService
         }
 
         _tagApplicationCache.Remove(application);
+        InvalidateInheritedCaches();
     }
 
     private static HashSet<ExplorerItem> GetItemsBelow(ItemIndex items, string rootPath)
@@ -473,6 +881,7 @@ public class DataCachingService
         _tagApplicationCache.Clear();
         _tagApplicationsByPath.Clear();
         _tagApplicationsByTagId.Clear();
+        InvalidateInheritedCaches();
     }
 
     /// <summary>

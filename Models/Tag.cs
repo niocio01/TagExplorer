@@ -115,21 +115,78 @@ public partial class FilterTag : Filter, ITag
     }
 }
 
+public enum AppliedTagKind
+{
+    /// <summary>Assigned to the item itself.</summary>
+    Direct,
+
+    /// <summary>Reaches the item through an assignment on a folder above it.</summary>
+    Virtual,
+
+    /// <summary>A rule on the folder that only tags items below it (its subfolders).</summary>
+    Rule
+}
+
+/// <summary>
+/// A tag shown on the selected item in the details pane, with the actions of its context menu.
+/// </summary>
 public partial class AppliedTag : ITag
 {
-    public TagApplication? Application { get; init; }
-    public Tag Tag => Application.Tag;
+    public required Tag Tag { get; init; }
+    public required TagAssignment Assignment { get; init; }
+    public required AppliedTagKind Kind { get; init; }
+
+    public bool IsVirtual => Kind == AppliedTagKind.Virtual;
+    public bool IsRule => Kind == AppliedTagKind.Rule;
+    public bool CanRemove => Kind != AppliedTagKind.Virtual;
+
+    /// <summary>
+    /// The folder the assignment sits on (for virtual tags, the folder the tag comes from).
+    /// </summary>
+    public string SourcePath => Assignment.TargetPath;
+    public string SourceName => System.IO.Path.GetFileName(SourcePath) is { Length: > 0 } name ? name : SourcePath;
+    public string GoToSourceHeader => $"Go to \"{SourceName}\"";
+    public string RemoveFromSourceHeader => $"Remove from \"{SourceName}\"";
+
+    public string ToolTipText => Kind switch
+    {
+        AppliedTagKind.Virtual => $"From {SourcePath}",
+        AppliedTagKind.Rule => $"{ModeDisplayName}: tags the subfolders, not this folder",
+        _ => Tag.Description ?? Tag.Name ?? string.Empty
+    };
+
+    private string ModeDisplayName => AssignmentModes.Of(Assignment) is AssignmentMode mode
+        ? AssignmentModes.DisplayName(mode)
+        : string.Empty;
+
+    /// <summary>
+    /// The kinds the assignment can be changed to; empty if it can't be changed (files, virtual tags).
+    /// </summary>
+    public IReadOnlyList<AssignmentModeOption> ModeOptions { get; init; } = [];
+    public bool CanChangeMode => ModeOptions.Count > 0;
+
+    public System.Windows.Input.ICommand? GoToSourceCommand { get; init; }
+    public System.Windows.Input.ICommand? RemoveFromSourceCommand { get; init; }
+
     public int? Id => Tag.Id;
     public string? Name => Tag.Name;
     public Color? Color => Tag.Color;
-    public string? Description => Tag.Description;
+
+    // The chip shows the description as its tooltip; for virtual tags and rules it says where the tag comes from.
+    public string? Description => Kind == AppliedTagKind.Direct ? Tag.Description : ToolTipText;
     public string? IconName => Tag.IconName;
     public string? ShortCode => Tag.ShortCode;
     public List<string>? Aliases => Tag.Aliases;
     public bool IsSystemTag => Tag.IsSystemTag;
 
-    public AppliedTag(TagApplication tagApplication)
-    {
-        Application = tagApplication;
-    }
 }
+
+/// <summary>
+/// One entry of the "Kind" menu of an applied tag.
+/// </summary>
+public sealed record AssignmentModeOption(string Header, bool IsCurrent, System.Windows.Input.ICommand Command);
+
+/// <summary>
+/// A tag dropped with Shift held and a kind picked from the menu.
+/// </summary>
+public sealed record TagDropRequest(object Payload, AssignmentMode Mode);

@@ -1,11 +1,13 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using CommunityToolkit.Mvvm.Messaging;
 using Microsoft.EntityFrameworkCore;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.Windows;
 using TagExplorer.Data;
+using TagExplorer.Models.Messages;
 using TagExplorer.Services;
 using TagExplorer.Views;
 using Color = TagExplorer.Data.Color;
@@ -100,6 +102,40 @@ public partial class TagsOverview_VM : ObservableValidator
 
         UpdateTagsVMs();
         ChildrenVMs = new ObservableCollection<Tag_VM>();
+
+        // Tags are also created and deleted outside this view (child tags of folder rules).
+        WeakReferenceMessenger.Default.Register<TagsChangedMessage>(this, static (recipient, _) =>
+        {
+            ((TagsOverview_VM)recipient).SyncTagVMs();
+        });
+    }
+
+    private void SyncTagVMs()
+    {
+        var tagIds = _db.Tags.AsNoTracking().Select(t => t.Id).ToHashSet();
+
+        foreach (var removedVM in TagVMs.Where(vm => !tagIds.Contains(vm.Tag.Id)).ToList())
+        {
+            removedVM.TagPressed -= TagVM_TagPressed;
+            TagVMs.Remove(removedVM);
+            if (removedVM == SelectedTagVM)
+            {
+                ClearEditor();
+            }
+        }
+
+        var shownIds = TagVMs.Select(vm => vm.Tag.Id).ToHashSet();
+        var addedTags = _db.Tags
+            .Include(tag => tag.Color)
+            .Where(tag => !shownIds.Contains(tag.Id))
+            .ToList();
+
+        foreach (TagDTO tag in addedTags)
+        {
+            var tagVM = new Tag_VM(tag);
+            tagVM.TagPressed += TagVM_TagPressed;
+            TagVMs.Add(tagVM);
+        }
     }
 
     private void ColorButtonVM_ColorPressed(object? sender, EventArgs e)
@@ -265,46 +301,29 @@ public partial class TagsOverview_VM : ObservableValidator
         if (SelectedTag.IsSystemTag)
             return;
 
-        TagDTO tag = SelectedTag;
-        int assignedItemCount = _db.TagAssignments.Count(a => a.TagId == tag.Id && !a.IsArchived && a.Enabled);
+        if (_dataCachingService is null)
+            return;
 
-        string message = assignedItemCount == 0
-            ? $"Delete the tag \"{tag.Name}\"?"
-            : $"Delete the tag \"{tag.Name}\"? It is assigned to {assignedItemCount} item(s); it will be removed from them.";
+        TagDTO tag = SelectedTag;
+        var tagIds = _dataCachingService.GetTagAndDescendantIds(tag.Id).ToList();
+        int assignmentCount = _db.TagAssignments.Count(a =>
+            ((a.TagId != null && tagIds.Contains(a.TagId.Value))
+                || (a.AutoRuleParentTagId != null && tagIds.Contains(a.AutoRuleParentTagId.Value)))
+            && !a.IsArchived && a.Enabled);
+
+        string message = $"Delete the tag \"{tag.Name}\"?";
+        if (tagIds.Count > 1)
+            message += $" Its {tagIds.Count - 1} child tag(s) are deleted too.";
+        if (assignmentCount > 0)
+            message += $" {assignmentCount} assignment(s) on files or folders are removed.";
 
         MessageBoxResult result = MessageBox.Show(message, "Delete tag", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
         if (result != MessageBoxResult.Yes)
             return;
 
-        RemoveAssignmentsOfTag(tag.Id);
-
-        TagVMs.Remove(TagVMs.First(vm => vm.Tag == tag));
-        _db.Tags.Remove(tag);
-        _db.SaveChanges();
-        _dataCachingService?.RemoveTag(tag.Id);
-
+        // Also removes the deleted tags from TagVMs (SyncTagVMs) and clears the editor.
+        _dataCachingService.DeleteTagWithChildren(tag.Id);
         ClearEditor();
-    }
-
-    // There is no foreign key from TagAssignments to Tags, so assignments of a deleted tag must be removed here.
-    private void RemoveAssignmentsOfTag(int tagId)
-    {
-        // Goes through the cache so badges and filters update; this archives the assignments.
-        if (_dataCachingService is not null)
-        {
-            foreach (var application in _dataCachingService.GetTagApplicationsForTag(tagId))
-            {
-                _dataCachingService.RemoveTagApplication(application);
-            }
-        }
-
-        // Assignments whose item isn't in the cache (e.g. a missing file) are archived directly.
-        _db.TagAssignments
-            .Where(a => a.TagId == tagId && !a.IsArchived)
-            .ExecuteUpdate(setters => setters
-                .SetProperty(a => a.IsArchived, true)
-                .SetProperty(a => a.Enabled, false)
-                .SetProperty(a => a.UpdatedAtUtc, DateTime.UtcNow));
     }
 
     [RelayCommand]

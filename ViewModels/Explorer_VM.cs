@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.IO;
 using TagExplorer.Data;
 using TagExplorer.Models;
 using TagExplorer.Models.Messages;
@@ -100,6 +101,11 @@ public partial class Explorer_VM : ObservableObject
         WeakReferenceMessenger.Default.Register<TagsChangedMessage>(this, static (recipient, _) =>
         {
             ((Explorer_VM)recipient).SyncFilterTags();
+        });
+
+        WeakReferenceMessenger.Default.Register<NavigateToFolderMessage>(this, static (recipient, message) =>
+        {
+            ((Explorer_VM)recipient).NavigateToFolder(message.FolderPath);
         });
 
         AllFilterExtention_VMs = new ObservableCollection<ExtentionButton_VM>();
@@ -243,6 +249,34 @@ public partial class Explorer_VM : ObservableObject
     }
 
     private static bool IsHomeBreadcrumb(Folder folder) => folder.Name == HomeBreadcrumbName;
+
+    /// <summary>
+    /// Opens the folder at the path, if it lies in one of the base folders.
+    /// </summary>
+    private void NavigateToFolder(string folderPath)
+    {
+        var baseFolder = _db?.BaseFolders.AsNoTracking().AsEnumerable()
+            .Where(b => string.Equals(folderPath, b.Path, StringComparison.OrdinalIgnoreCase)
+                || folderPath.StartsWith(b.Path.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(b => b.Path.Length)
+            .FirstOrDefault();
+
+        if (baseFolder is null)
+        {
+            return;
+        }
+
+        var breadcrumbs = new List<Folder> { new Folder(baseFolder.Path, baseFolder.Name, false) };
+        var relativePath = folderPath[baseFolder.Path.Length..];
+        foreach (var name in relativePath.Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries))
+        {
+            breadcrumbs.Add(new Folder(name, breadcrumbs[^1], false));
+        }
+
+        Breadcrumbs = new ObservableCollection<Folder>(breadcrumbs);
+        SetCurrentFolderItems(breadcrumbs[^1]);
+        AddToHistory(breadcrumbs);
+    }
 
     private void SetCurrentPathToHome(IReadOnlyList<BaseFolder>? baseFolders = null)
     {

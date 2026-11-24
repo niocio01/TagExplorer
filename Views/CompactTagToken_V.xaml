@@ -22,6 +22,10 @@
                         <Setter Property="Background" Value="Transparent" />
                         <Setter Property="BorderBrush" Value="{DynamicResource MaterialDesignDivider}" />
                     </DataTrigger>
+                    <!-- Virtual tags (inherited from a folder above): outlined instead of filled. -->
+                    <DataTrigger Binding="{Binding IsVirtual}" Value="True">
+                        <Setter Property="Background" Value="Transparent" />
+                    </DataTrigger>
                 </Style.Triggers>
             </Style>
         </Border.Style>
@@ -37,6 +41,9 @@
                     <Style.Triggers>
                         <DataTrigger Binding="{Binding IsOverflow}" Value="True">
                             <Setter Property="Foreground" Value="{DynamicResource MaterialDesignBody}" />
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding IsVirtual}" Value="True">
+                            <Setter Property="Foreground" Value="{Binding ColorHex}" />
                         </DataTrigger>
                     </Style.Triggers>
                 </Style>
