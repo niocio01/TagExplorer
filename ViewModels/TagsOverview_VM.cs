@@ -260,11 +260,8 @@ public partial class TagsOverview_VM : ObservableValidator
             TagDTO newDTOTag = new(Name!, Color!, Description, ParseAliases(), IconName!, shortCode: ShortCode);
             _db.Tags.Add(newDTOTag);
             _db.SaveChanges();
+            // UpsertTag sends TagsChangedMessage; SyncTagVMs adds the new tag to TagVMs.
             _dataCachingService?.UpsertTag(newDTOTag);
-
-            var newTagVm = new Tag_VM(newDTOTag);
-            TagVMs.Add(newTagVm);
-            newTagVm.TagPressed += TagVM_TagPressed;
         }
         // edit existing tag
         else
