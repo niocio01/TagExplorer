@@ -164,7 +164,8 @@ public partial class Explorer_VM : ObservableObject
             AddFilterTag(tag);
         }
 
-        if (removedActiveFilter)
+        // Active filters are re-applied too: a generated child tag gets a new id when it is stored.
+        if (removedActiveFilter || _requiredTagFilters.Count > 0 || _disallowedTagFilters.Count > 0)
         {
             RequiredTagFilterCount = _requiredTagFilters.Count;
             DisallowedTagFilterCount = _disallowedTagFilters.Count;

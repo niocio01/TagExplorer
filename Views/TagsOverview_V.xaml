@@ -14,6 +14,7 @@
      d:DataContext="{d:DesignInstance Type=viewModels:TagsOverview_VM, IsDesignTimeCreatable=True}">
     <UserControl.Resources>
         <c:InverseBooleanConverter x:Key="InverseBool"/>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
         <c:BooleanToString x:Key="BoolToEditModeString" TrueString="New Tag" FalseString="Edit Tag"/>
         <c:BooleanToString x:Key="BoolToSaveButtonString" TrueString="Create Tag" FalseString="Save Changes"/>
         <Style x:Key="TagOverviewChipStyle" TargetType="materialDesign:Chip" BasedOn="{StaticResource MaterialDesignOutlineChip}">
@@ -51,7 +52,21 @@
                                 DataContext="{Binding}"
                                 IsPickUpable="False"
                                 ChipStyle="{StaticResource TagOverviewChipStyle}"
-                                ClickCommand="{Binding PressTagCommand}" />
+                                ClickCommand="{Binding PressTagCommand}">
+                                <local:TagBase_V.Style>
+                                    <Style TargetType="local:TagBase_V">
+                                        <Style.Triggers>
+                                            <!-- Hidden subfolder tags: barely visible; orphaned ones: warning colour. -->
+                                            <DataTrigger Binding="{Binding IsHidden}" Value="True">
+                                                <Setter Property="Opacity" Value="0.35" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding IsOrphaned}" Value="True">
+                                                <Setter Property="Foreground" Value="{DynamicResource MaterialDesign.Brush.Secondary}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </local:TagBase_V.Style>
+                            </local:TagBase_V>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                     <ItemsControl.ItemsPanel>
@@ -61,12 +76,27 @@
                     </ItemsControl.ItemsPanel>
                 </ItemsControl>
             </ScrollViewer>
-            <Button
-                Grid.Row="2"
-                Content="Add Tag"
-                Command="{Binding Path=AddTagCommand}"
-                Style="{StaticResource MaterialDesignRaisedButton}">
-            </Button>
+            <DockPanel Grid.Row="2" LastChildFill="True">
+                <CheckBox
+                    DockPanel.Dock="Left"
+                    Margin="0 0 10 0"
+                    VerticalAlignment="Center"
+                    Content="Show subfolder tags"
+                    ToolTip="Tags of the subfolders of folder rules: generated (italic) and customised ones"
+                    IsChecked="{Binding Path=ShowAutoCreatedTags}" />
+                <CheckBox
+                    DockPanel.Dock="Left"
+                    Margin="0 0 10 0"
+                    VerticalAlignment="Center"
+                    Content="Show hidden tags"
+                    ToolTip="Subfolder tags you hid; select one and press the eye button to show it again"
+                    IsChecked="{Binding Path=ShowHiddenTags}" />
+                <Button
+                    Content="Add Tag"
+                    Command="{Binding Path=AddTagCommand}"
+                    Style="{StaticResource MaterialDesignRaisedButton}">
+                </Button>
+            </DockPanel>
         </Grid>
         <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Center" />
 
@@ -210,6 +240,7 @@
                 Grid.Row="5">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="10"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
@@ -220,8 +251,18 @@
                     Style="{StaticResource MaterialDesignRaisedSecondaryLightButton}">
                 </Button>
 
+                <!-- Only for stored (customised or hidden) subfolder tags. -->
                 <Button
-                    Grid.Column="2"
+                    Grid.Column="1"
+                    Margin="10 0 0 0"
+                    Content="Reset to generated"
+                    ToolTip="Drop the changes to this subfolder tag and use the generated one again"
+                    Visibility="{Binding Path=CanResetToGenerated, Converter={StaticResource BooleanToVisibilityConverter}}"
+                    Command="{Binding Path=ResetToGeneratedCommand}"
+                    Style="{StaticResource MaterialDesignOutlinedButton}" />
+
+                <Button
+                    Grid.Column="3"
                     Width="32"
                     Margin="0"
                     Padding="0"
@@ -229,11 +270,13 @@
                         Converter={StaticResource InverseBool}, 
                         FallbackValue=False}"
                     Command="{Binding Path=DeleteTagCommand}"
+                    ToolTip="{Binding Path=DeleteButtonToolTip}"
                     Style="{StaticResource MaterialDesignRaisedButton}">
+                    <!-- Delete; for subfolder tags Hide (eye off) or Show again (eye). -->
                     <materialDesign:PackIcon
                         HorizontalContentAlignment="Center"
                         Width="20" Height="20"
-                        Kind="Delete" />
+                        Kind="{Binding Path=DeleteButtonIcon}" />
                 </Button>
             </Grid>
         </Grid>

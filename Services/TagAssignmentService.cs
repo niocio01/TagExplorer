@@ -30,7 +30,10 @@ public class TagAssignmentService
             return false;
         }
 
-        return AddAssignment(targetPath, targetType, tag.Id.Value, mode, item);
+        // An assignment needs a stored tag; generated child tags are stored on first use.
+        tag = _dcs.StoreGeneratedTag(tag);
+
+        return AddAssignment(targetPath, targetType, tag.Id!.Value, mode, item);
     }
 
     /// <summary>
@@ -51,21 +54,6 @@ public class TagAssignmentService
     public void RemoveAssignment(TagAssignment assignment)
     {
         _dcs.RemoveAssignment(assignment);
-    }
-
-    /// <summary>
-    /// The assignments that assigning the tag to the item in the given mode would replace (same tag, other kind).
-    /// </summary>
-    public IReadOnlyList<TagAssignment> GetAssignmentsReplacedBy(ExplorerItem item, Tag tag, AssignmentMode mode)
-    {
-        if (tag.Id is null || !TryGetAssignmentTarget(item, out var targetPath, out var targetType))
-        {
-            return [];
-        }
-
-        return GetAssignmentsOfTagOnItem(targetPath, targetType, tag.Id.Value)
-            .Where(a => AssignmentModes.Of(a) != mode)
-            .ToList();
     }
 
     private List<TagAssignment> GetAssignmentsOfTagOnItem(string targetPath, TargetType targetType, int tagId)

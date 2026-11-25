@@ -16,6 +16,17 @@
     <Grid PreviewMouseLeftButtonDown="Grid_PreviewMouseLeftButtonDown"
           PreviewMouseLeftButtonUp="Grid_PreviewMouseLeftButtonUp"
           PreviewMouseMove="Grid_PreviewMouseMove">
+        <Grid.Style>
+            <Style TargetType="Grid">
+                <Style.Triggers>
+                    <!-- Child tags generated for subfolders (not stored): italic and slightly faded. -->
+                    <DataTrigger Binding="{Binding Path=IsGenerated}" Value="True">
+                        <Setter Property="TextElement.FontStyle" Value="Italic" />
+                        <Setter Property="Opacity" Value="0.7" />
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+        </Grid.Style>
 
         <materialDesign:Chip
             Content="{Binding Path=Name}"

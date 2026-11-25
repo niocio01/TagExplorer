@@ -41,6 +41,20 @@ public class TagDTO
 
     public bool IsSystemTag { get; set; }
 
+    /// <summary>
+    /// For a stored child tag of a child-tag rule: the subfolder it stands for. It replaces the tag generated for
+    /// that subfolder (or hides it, if archived).
+    /// </summary>
+    [MaxLength(2048)]
+    [Column(TypeName = "varchar(2048)")]
+    public string? AutoSourcePath { get; set; }
+
+    /// <summary>
+    /// True for a generated child tag that only exists at runtime (never saved).
+    /// </summary>
+    [NotMapped]
+    public bool IsGenerated { get; set; }
+
     // Parameterless constructor required by EF
     public TagDTO() { }
 

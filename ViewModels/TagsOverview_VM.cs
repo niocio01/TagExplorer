@@ -6,6 +6,8 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.Windows;
+using System.Windows.Data;
+using System.Windows.Threading;
 using TagExplorer.Data;
 using TagExplorer.Models.Messages;
 using TagExplorer.Services;
@@ -28,6 +30,9 @@ public partial class TagsOverview_VM : ObservableValidator
    [
         nameof(EditEnabled),
         nameof(SomeTagIsSelected),
+        nameof(CanResetToGenerated),
+        nameof(DeleteButtonIcon),
+        nameof(DeleteButtonToolTip),
     ])]
 
     private Tag_VM? _selectedTagVM;
@@ -72,12 +77,39 @@ public partial class TagsOverview_VM : ObservableValidator
     [NotifyPropertyChangedFor(nameof(EditEnabled))]
     private bool _newTagEdit;
 
+    /// <summary>
+    /// Whether the tag list shows the tags created automatically for subfolders.
+    /// </summary>
+    [ObservableProperty]
+    private bool _showAutoCreatedTags = true;
+
+    /// <summary>True if the selected tag is a stored (customised or hidden) subfolder tag that can be reset.</summary>
+    public bool CanResetToGenerated => SelectedTag is { AutoSourcePath: not null, IsGenerated: false };
+
+    /// <summary>Whether the tag list also shows hidden subfolder tags.</summary>
+    [ObservableProperty]
+    private bool _showHiddenTags;
+
+    private bool SelectedIsHidden => SelectedTag is { AutoSourcePath: not null, IsArchived: true };
+
+    // Subfolder tags are hidden instead of deleted, else their rule would generate them again.
+    private bool SelectedIsHideable => SelectedTag is { AutoSourcePath: not null, IsArchived: false } && SelectedTagVM?.IsOrphaned != true;
+
+    public string DeleteButtonIcon => SelectedIsHidden ? "Eye" : SelectedIsHideable ? "EyeOff" : "Delete";
+
+    public string DeleteButtonToolTip => SelectedIsHidden
+        ? "Show this subfolder tag again"
+        : SelectedIsHideable ? "Hide this subfolder tag" : "Delete tag";
+
     public TagDTO? SelectedTag => SelectedTagVM?.Tag;
     public bool SomeTagIsSelected => SelectedTag is not null;
     public bool EditEnabled => SomeTagIsSelected || NewTagEdit;
 
     private AppDbContext _db;
     private readonly DataCachingService? _dataCachingService;
+
+    // The thread owning TagVMs; tag messages can come from cache-build worker threads.
+    private readonly Dispatcher _dispatcher = Dispatcher.CurrentDispatcher;
 
     public TagsOverview_VM()
     {
@@ -103,16 +135,68 @@ public partial class TagsOverview_VM : ObservableValidator
         UpdateTagsVMs();
         ChildrenVMs = new ObservableCollection<Tag_VM>();
 
-        // Tags are also created and deleted outside this view (child tags of folder rules).
-        WeakReferenceMessenger.Default.Register<TagsChangedMessage>(this, static (recipient, _) =>
+        // Tags also change outside this view (generated child tags after a cache build, tags stored on first use).
+        // The message can come from a worker thread.
+        WeakReferenceMessenger.Default.Register<TagsChangedMessage>(this, static (recipient, message) =>
         {
-            ((TagsOverview_VM)recipient).SyncTagVMs();
+            var vm = (TagsOverview_VM)recipient;
+            if (!vm._dispatcher.CheckAccess())
+            {
+                _ = vm._dispatcher.InvokeAsync(vm.SyncTagVMs);
+                return;
+            }
+
+            vm.SyncTagVMs();
         });
     }
 
+    partial void OnTagVMsChanged(ObservableCollection<Tag_VM> value)
+    {
+        CollectionViewSource.GetDefaultView(value).Filter = item => item is Tag_VM vm
+            && (vm.IsHidden ? ShowHiddenTags : ShowAutoCreatedTags || !vm.IsSubfolderTag);
+    }
+
+    partial void OnShowAutoCreatedTagsChanged(bool value)
+    {
+        CollectionViewSource.GetDefaultView(TagVMs).Refresh();
+    }
+
+    partial void OnShowHiddenTagsChanged(bool value)
+    {
+        CollectionViewSource.GetDefaultView(TagVMs).Refresh();
+    }
+
+    /// <summary>
+    /// Brings the list in line with the stored tags (DB) and the generated child tags (cache).
+    /// </summary>
     private void SyncTagVMs()
     {
-        var tagIds = _db.Tags.AsNoTracking().Select(t => t.Id).ToHashSet();
+        // Rows changed through another DbContext (e.g. a subfolder tag hidden by DataCachingService) are reloaded,
+        // and their entries rebuilt; tracked instances would otherwise keep the old values.
+        var updatedAtById = _db.Tags.AsNoTracking().Select(t => new { t.Id, t.UpdatedAtUtc }).ToDictionary(t => t.Id, t => t.UpdatedAtUtc);
+        var changedEntries = _db.ChangeTracker.Entries<TagDTO>()
+            .Where(entry => entry.State == EntityState.Unchanged
+                && updatedAtById.TryGetValue(entry.Entity.Id, out var updatedAt)
+                && updatedAt != entry.Entity.UpdatedAtUtc)
+            .ToList();
+
+        foreach (var entry in changedEntries)
+        {
+            entry.Reload();
+            foreach (var changedVM in TagVMs.Where(vm => vm.Tag.Id == entry.Entity.Id).ToList())
+            {
+                changedVM.TagPressed -= TagVM_TagPressed;
+                TagVMs.Remove(changedVM);
+                if (changedVM == SelectedTagVM)
+                {
+                    ClearEditor();
+                }
+            }
+        }
+
+        var storedTags = _db.Tags.Include(tag => tag.Color).ToList();
+        var generatedTags = _dataCachingService?.Tags.Where(tag => tag.IsGenerated).ToList() ?? [];
+        var tagIds = storedTags.Select(t => t.Id).Concat(generatedTags.Select(t => t.Id!.Value)).ToHashSet();
 
         foreach (var removedVM in TagVMs.Where(vm => !tagIds.Contains(vm.Tag.Id)).ToList())
         {
@@ -125,16 +209,19 @@ public partial class TagsOverview_VM : ObservableValidator
         }
 
         var shownIds = TagVMs.Select(vm => vm.Tag.Id).ToHashSet();
-        var addedTags = _db.Tags
-            .Include(tag => tag.Color)
-            .Where(tag => !shownIds.Contains(tag.Id))
-            .ToList();
+        var addedVMs = storedTags.Where(tag => !shownIds.Contains(tag.Id)).Select(tag => new Tag_VM(tag))
+            .Concat(generatedTags.Where(tag => !shownIds.Contains(tag.Id!.Value)).Select(Tag_VM.ForGenerated));
 
-        foreach (TagDTO tag in addedTags)
+        foreach (var tagVM in addedVMs)
         {
-            var tagVM = new Tag_VM(tag);
             tagVM.TagPressed += TagVM_TagPressed;
             TagVMs.Add(tagVM);
+        }
+
+        foreach (var tagVM in TagVMs)
+        {
+            tagVM.IsOrphaned = tagVM.Tag is { AutoSourcePath: not null, IsGenerated: false, IsArchived: false }
+                && _dataCachingService?.IsActiveChildTag(tagVM.Tag.Id) == false;
         }
     }
 
@@ -154,21 +241,8 @@ public partial class TagsOverview_VM : ObservableValidator
 
     private void UpdateTagsVMs()
     {
-        List<TagDTO> dtoTags = _db.Tags
-            .Include(tag => tag.Color)
-            .ToList();
-
         TagVMs = new ObservableCollection<Tag_VM>();
-        foreach (TagDTO tag in dtoTags)
-        {
-            TagVMs.Add(new Tag_VM(tag));
-        }
-
-        // add clicked event handler
-        foreach (Tag_VM tagVM in TagVMs)
-        {
-            tagVM.TagPressed += TagVM_TagPressed;
-        }
+        SyncTagVMs();
     }
 
     private void TagVM_TagPressed(object? sender, EventArgs e)
@@ -210,8 +284,11 @@ public partial class TagsOverview_VM : ObservableValidator
         ShortCode = SelectedTag?.ShortCode;
         // Keep the selected tag's own icon and colour, so saving other changes doesn't reset them.
         IconName = SelectedTag?.IconName ?? DefaultIconString;
-        Color = SelectedTag?.Color ?? DefaultTagColor;
-        ColorButtonVMs.First(vm => vm.Color == Color).SelectColor();
+        // Match by id: generated tags carry a Color instance from another DbContext. Use this context's instance,
+        // so a later save references a tracked Color.
+        var colorButtonVM = ColorButtonVMs.First(vm => vm.Color.Id == (SelectedTag?.Color ?? DefaultTagColor).Id);
+        Color = colorButtonVM.Color;
+        colorButtonVM.SelectColor();
     }
 
     private void ClearEditor()
@@ -266,6 +343,11 @@ public partial class TagsOverview_VM : ObservableValidator
         // edit existing tag
         else
         {
+            if (SelectedTag!.IsGenerated && !StoreSelectedGeneratedTag())
+            {
+                return;
+            }
+
             SelectedTag!.Name = Name!;
             SelectedTag.Description = Description;
             SelectedTag.Aliases = ParseAliases();
@@ -278,6 +360,48 @@ public partial class TagsOverview_VM : ObservableValidator
         }
 
         NewTagEdit = false;
+    }
+
+    /// <summary>
+    /// Stores the selected generated child tag before it is edited, then selects its stored version. The editor
+    /// values are kept, since the list sync replaces the selected entry.
+    /// </summary>
+    private bool StoreSelectedGeneratedTag()
+    {
+        if (_dataCachingService?.GetTag(SelectedTag!.Id) is not Models.Tag generatedTag)
+        {
+            return false;
+        }
+
+        var (name, description, aliasString, iconName, shortCode, color) = (Name, Description, AliasString, IconName, ShortCode, Color);
+
+        var storedTag = _dataCachingService.StoreGeneratedTag(generatedTag);
+        var storedVM = TagVMs.FirstOrDefault(vm => vm.Tag.Id == storedTag.Id);
+        if (storedVM is null)
+        {
+            return false;
+        }
+
+        storedVM.PressTag();
+        (Name, Description, AliasString, IconName, ShortCode, Color) = (name, description, aliasString, iconName, shortCode, color);
+        return true;
+    }
+
+    [RelayCommand]
+    public void ResetToGenerated()
+    {
+        if (!CanResetToGenerated || _dataCachingService is null)
+            return;
+
+        TagDTO tag = SelectedTag!;
+        var result = MessageBox.Show(
+            $"Reset the tag of \"{tag.AutoSourcePath}\" to the generated one? Its name, aliases and other changes are lost, and it is removed from the items it was assigned to.",
+            "Reset tag", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
+        if (result != MessageBoxResult.Yes)
+            return;
+
+        _dataCachingService.DeleteTagWithChildren(tag.Id);
+        ClearEditor();
     }
 
     // One alias per line; blank lines are ignored, and no aliases are stored as null instead of [""].
@@ -302,6 +426,20 @@ public partial class TagsOverview_VM : ObservableValidator
             return;
 
         TagDTO tag = SelectedTag;
+
+        if (SelectedIsHidden)
+        {
+            _dataCachingService.UnhideChildTag(tag.Id);
+            ClearEditor();
+            return;
+        }
+
+        if (SelectedIsHideable)
+        {
+            HideSelectedSubfolderTag(tag);
+            return;
+        }
+
         var tagIds = _dataCachingService.GetTagAndDescendantIds(tag.Id).ToList();
         int assignmentCount = _db.TagAssignments.Count(a =>
             ((a.TagId != null && tagIds.Contains(a.TagId.Value))
@@ -320,6 +458,24 @@ public partial class TagsOverview_VM : ObservableValidator
 
         // Also removes the deleted tags from TagVMs (SyncTagVMs) and clears the editor.
         _dataCachingService.DeleteTagWithChildren(tag.Id);
+        ClearEditor();
+    }
+
+    private void HideSelectedSubfolderTag(TagDTO tag)
+    {
+        if (_dataCachingService?.GetTag(tag.Id) is not Models.Tag cachedTag)
+            return;
+
+        string message = $"Hide the tag \"{tag.Name}\"? The folder \"{tag.AutoSourcePath}\" gets no tag from its rule any more.";
+        if (!tag.IsGenerated)
+            message += " The tag is also removed from the items it was assigned to.";
+        message += " Tick \"Show hidden tags\" to find it and show it again.";
+
+        MessageBoxResult result = MessageBox.Show(message, "Hide tag", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
+        if (result != MessageBoxResult.Yes)
+            return;
+
+        _dataCachingService.HideChildTag(cachedTag);
         ClearEditor();
     }
 

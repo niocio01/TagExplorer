@@ -14,6 +14,7 @@ public interface ITag
     string? ShortCode { get; }
     List<string>? Aliases { get; }
     bool IsSystemTag { get; }
+    bool IsGenerated { get; }
 }
 
 public partial class Tag : ObservableValidator, ITag
@@ -53,6 +54,11 @@ public partial class Tag : ObservableValidator, ITag
 
     [ObservableProperty] private List<string>? _aliases;
     [ObservableProperty] private bool _isSystemTag = false;
+    /// <summary>True for a child tag generated at runtime for a subfolder (not stored in the DB).</summary>
+    [ObservableProperty] private bool _isGenerated;
+
+    /// <summary>For child tags of a child-tag rule: the subfolder the tag stands for.</summary>
+    [ObservableProperty] private string? _autoSourcePath;
 
     public Tag(TagDTO dto)
     {
@@ -70,6 +76,30 @@ public partial class Tag : ObservableValidator, ITag
         ShortCode = dto.ShortCode;
         Aliases = dto.Aliases;
         IsSystemTag = dto.IsSystemTag;
+        AutoSourcePath = dto.AutoSourcePath;
+    }
+
+    /// <summary>
+    /// Creates the runtime-only child tag of a child-tag rule for one subfolder. It looks like its parent tag.
+    /// </summary>
+    public static Tag CreateGenerated(int id, string name, Tag parent, string sourcePath)
+    {
+        var dto = new TagDTO
+        {
+            Id = id,
+            Name = name,
+            Color = parent.Color!,
+            ColorId = parent.Color?.Id ?? 0,
+            IconName = parent.IconName ?? string.Empty,
+            Description = $"Generated for {sourcePath}",
+            AutoSourcePath = sourcePath
+        };
+
+        return new Tag(dto)
+        {
+            Parent = parent,
+            IsGenerated = true
+        };
     }
 
     /// <summary>
@@ -85,6 +115,7 @@ public partial class Tag : ObservableValidator, ITag
         ShortCode = dto.ShortCode;
         Aliases = dto.Aliases;
         IsSystemTag = dto.IsSystemTag;
+        AutoSourcePath = dto.AutoSourcePath;
     }
 
     public bool IsValid()
@@ -106,6 +137,7 @@ public partial class FilterTag : Filter, ITag
     public string? ShortCode => Tag.ShortCode;
     public List<string>? Aliases => Tag.Aliases;
     public bool IsSystemTag => Tag.IsSystemTag;
+    public bool IsGenerated => Tag.IsGenerated;
 
     public FilterTag(Tag tag)
     {
@@ -178,6 +210,7 @@ public partial class AppliedTag : ITag
     public string? ShortCode => Tag.ShortCode;
     public List<string>? Aliases => Tag.Aliases;
     public bool IsSystemTag => Tag.IsSystemTag;
+    public bool IsGenerated => Tag.IsGenerated;
 
 }
 

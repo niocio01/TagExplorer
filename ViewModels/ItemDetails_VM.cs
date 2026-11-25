@@ -179,28 +179,14 @@ public partial class ItemDetails_VM : ObservableObject
             }
         }
 
-        var childTagsToDelete = ChildTagCleanup.AskWhichToDelete(_dcs, [appliedTag.Assignment]);
-        if (childTagsToDelete is null)
-        {
-            return;
-        }
-
         _tagAssignmentService.RemoveAssignment(appliedTag.Assignment);
-        ChildTagCleanup.Delete(_dcs, childTagsToDelete);
 
         ReloadSelectedItemTags();
     }
 
     private void ChangeMode(AppliedTag appliedTag, AssignmentMode mode)
     {
-        if (_tagAssignmentService is null || _dcs is null || AssignmentModes.Of(appliedTag.Assignment) == mode)
-        {
-            return;
-        }
-
-        // Changing the kind replaces the assignment; a replaced child-tag rule leaves its child tags behind.
-        var childTagsToDelete = ChildTagCleanup.AskWhichToDelete(_dcs, [appliedTag.Assignment]);
-        if (childTagsToDelete is null)
+        if (_tagAssignmentService is null)
         {
             return;
         }
@@ -208,29 +194,15 @@ public partial class ItemDetails_VM : ObservableObject
         // Only direct tags and rules offer kinds, and both sit on the selected item.
         if (_tagAssignmentService.ChangeMode(appliedTag.Assignment, mode, SelectedItem))
         {
-            ChildTagCleanup.Delete(_dcs, childTagsToDelete);
             ReloadSelectedItemTags();
         }
     }
 
     private bool AddTagToSelectedItem(Tag tag, AssignmentMode mode)
     {
-        if (SelectedItem is null || _tagAssignmentService is null || _dcs is null)
-        {
-            return false;
-        }
-
-        // Assigning the tag in another kind replaces an existing assignment of it on this item.
-        var childTagsToDelete = ChildTagCleanup.AskWhichToDelete(_dcs, _tagAssignmentService.GetAssignmentsReplacedBy(SelectedItem, tag, mode));
-        if (childTagsToDelete is null)
-        {
-            return false;
-        }
-
-        var added = _tagAssignmentService.AssignTag(SelectedItem, tag, mode);
+        var added = _tagAssignmentService?.AssignTag(SelectedItem, tag, mode) == true;
         if (added)
         {
-            ChildTagCleanup.Delete(_dcs, childTagsToDelete);
             ReloadSelectedItemTags();
         }
 

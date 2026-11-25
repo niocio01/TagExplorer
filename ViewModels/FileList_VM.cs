@@ -208,25 +208,7 @@ public partial class FileList_VM : ObservableObject
             _ => null
         };
 
-        if (tag is null || _tagAssignmentService is null || _dataCachingService is null)
-        {
-            return false;
-        }
-
-        // Assigning the tag in another kind replaces an existing assignment of it on this item.
-        var childTagsToDelete = ChildTagCleanup.AskWhichToDelete(_dataCachingService, _tagAssignmentService.GetAssignmentsReplacedBy(targetItem, tag, mode));
-        if (childTagsToDelete is null)
-        {
-            return false;
-        }
-
-        var added = _tagAssignmentService.AssignTag(targetItem, tag, mode);
-        if (added)
-        {
-            ChildTagCleanup.Delete(_dataCachingService, childTagsToDelete);
-        }
-
-        return added;
+        return tag is not null && _tagAssignmentService?.AssignTag(targetItem, tag, mode) == true;
     }
 
     partial void OnSelectedItemChanged(ExplorerItem? value)

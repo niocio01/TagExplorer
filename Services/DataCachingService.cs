@@ -38,18 +38,34 @@ public class DataCachingService
     private readonly Dictionary<string, List<TagApplication>> _inheritedApplicationsByPath = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<int, HashSet<ExplorerItem>> _inheritedItemsByTagId = [];
 
+    // Child tags of child-tag rules, one per direct subfolder ("parentTagId|subfolder path" keys, see ChildTagKey).
+    // Generated tags only live here; stored overrides are in _tagCache, hidden ones in _hiddenChildTags.
+    private Dictionary<string, Tag> _generatedChildTagsByKey = new(StringComparer.OrdinalIgnoreCase);
+    private Dictionary<string, Tag> _childTagsByKey = new(StringComparer.OrdinalIgnoreCase);
+    private readonly List<Tag> _hiddenChildTags = [];
+    private int _nextGeneratedTagId = -1;
+
     private const int MaxTagNameLength = 50;
-    private const int MaxTagDescriptionLength = 200;
-    private const string AutoChildTagDescriptionPrefix = "Auto: ";
 
     /// <summary>
     /// The published item cache. The list is never changed after publishing.
     /// </summary>
     public IReadOnlyList<ExplorerItem> ItemCache => _items.Items;
 
+    /// <summary>
+    /// The stored tags and the generated child tags of child-tag rules.
+    /// </summary>
     public IReadOnlyList<Tag> Tags
     {
-        get { lock (_sync) return _tagCache.ToList(); }
+        get { lock (_sync) return _tagCache.Concat(_generatedChildTagsByKey.Values).ToList(); }
+    }
+
+    /// <summary>
+    /// Stored child tags that hide the generated tag of their subfolder.
+    /// </summary>
+    public IReadOnlyList<Tag> HiddenChildTags
+    {
+        get { lock (_sync) return _hiddenChildTags.ToList(); }
     }
 
     public IReadOnlyList<TagAssignment> TagAssignments
@@ -74,7 +90,9 @@ public class DataCachingService
                 .ThenInclude(parent => parent.Color)
             .ToList();
 
-        _tagCache.AddRange(cachedTagDtos.Select(dto => new Tag(dto)));
+        // Archived child tags only mark their subfolder as hidden; they are no usable tags.
+        _tagCache.AddRange(cachedTagDtos.Where(dto => !IsHiddenChildTag(dto)).Select(dto => new Tag(dto)));
+        _hiddenChildTags.AddRange(cachedTagDtos.Where(IsHiddenChildTag).Select(dto => new Tag(dto)));
         _tagAssignmentCache.AddRange(
             _db.TagAssignments.AsNoTracking()
             .Where(a => !a.IsArchived && a.Enabled && (a.TagId != null || a.AutoRuleParentTagId != null))
@@ -127,41 +145,89 @@ public class DataCachingService
             {
                 ApplyAssignment(assignment);
             }
+
+            RebuildChildTags();
         }
 
-        RunOnUiThread(EnsureChildTagsOfAllRules);
-
+        WeakReferenceMessenger.Default.Send(new TagsChangedMessage());
         WeakReferenceMessenger.Default.Send(new TagApplicationsChangedMessage());
     }
 
-    // Creates the tags of subfolders added since the rules were made. Uses the DbContext, so it runs on the UI thread.
-    private void EnsureChildTagsOfAllRules()
+    private static bool IsHiddenChildTag(TagDTO dto)
     {
-        List<TagAssignment> rules;
-        lock (_sync)
-        {
-            rules = _tagAssignmentCache.Where(a => a.Kind == AssignmentKind.AutoDirectChildrenAsChildTag).ToList();
-        }
-
-        foreach (var rule in rules)
-        {
-            EnsureChildTags(rule);
-        }
+        return dto.AutoSourcePath is not null && dto.IsArchived;
     }
 
-    private void RunOnUiThread(Action action)
+    private static string ChildTagKey(int parentTagId, string subfolderPath)
     {
-        var dispatcher = System.Windows.Application.Current?.Dispatcher;
-        if (dispatcher is not null && !dispatcher.CheckAccess())
+        return $"{parentTagId}|{subfolderPath}";
+    }
+
+    /// <summary>
+    /// Works out the child tag of every subfolder of every child-tag rule: a stored override if there is one,
+    /// nothing if hidden, otherwise a generated tag. Generated tags keep their object and id across rebuilds, so
+    /// filter chips holding them stay valid. Must be called with <see cref="_sync"/> held.
+    /// </summary>
+    private void RebuildChildTags()
+    {
+        var overridesByKey = new Dictionary<string, Tag>(StringComparer.OrdinalIgnoreCase);
+        foreach (var tag in _tagCache.Where(t => t.AutoSourcePath is not null && t.Parent?.Id is not null))
         {
-            // Not awaited, so log failures here instead of losing them.
-            _ = dispatcher.InvokeAsync(action).Task.ContinueWith(
-                task => _logger?.LogError(task.Exception, "Background UI work failed."),
-                TaskContinuationOptions.OnlyOnFaulted);
-            return;
+            overridesByKey.TryAdd(ChildTagKey(tag.Parent!.Id!.Value, tag.AutoSourcePath!), tag);
         }
 
-        action();
+        var hiddenKeys = _hiddenChildTags
+            .Where(t => t.AutoSourcePath is not null && t.Parent?.Id is not null)
+            .Select(t => ChildTagKey(t.Parent!.Id!.Value, t.AutoSourcePath!))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var generatedByKey = new Dictionary<string, Tag>(StringComparer.OrdinalIgnoreCase);
+        var childTagsByKey = new Dictionary<string, Tag>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var rule in _tagAssignmentCache.Where(a => a.Kind == AssignmentKind.AutoDirectChildrenAsChildTag))
+        {
+            if (FindCachedTag(rule.AutoRuleParentTagId) is not Tag parentTag || parentTag.Id is not int parentTagId)
+            {
+                continue;
+            }
+
+            foreach (var subfolder in GetDirectSubfolders(_items, rule.TargetPath))
+            {
+                var key = ChildTagKey(parentTagId, subfolder.Path);
+                if (childTagsByKey.ContainsKey(key) || hiddenKeys.Contains(key))
+                {
+                    continue;
+                }
+
+                if (overridesByKey.TryGetValue(key, out var storedTag))
+                {
+                    childTagsByKey[key] = storedTag;
+                    continue;
+                }
+
+                var generatedTag = _generatedChildTagsByKey.TryGetValue(key, out var existingTag)
+                    ? existingTag
+                    : Tag.CreateGenerated(_nextGeneratedTagId--, ToChildTagName(subfolder.Name), parentTag, subfolder.Path);
+
+                generatedByKey[key] = generatedTag;
+                childTagsByKey[key] = generatedTag;
+            }
+        }
+
+        _generatedChildTagsByKey = generatedByKey;
+        _childTagsByKey = childTagsByKey;
+        InvalidateInheritedCaches();
+    }
+
+    /// <summary>
+    /// True if the stored child tag currently stands for a subfolder of an active rule.
+    /// </summary>
+    public bool IsActiveChildTag(int tagId)
+    {
+        lock (_sync)
+        {
+            return _childTagsByKey.Values.Any(t => t.Id == tagId);
+        }
     }
 
     // Adds the application of an assignment to its own target. Rules that only tag items below their
@@ -193,14 +259,19 @@ public class DataCachingService
 
     private Tag? FindCachedTag(int? tagId)
     {
-        return tagId is null ? null : _tagCache.FirstOrDefault(t => t.Id == tagId);
+        if (tagId is null)
+        {
+            return null;
+        }
+
+        return tagId < 0
+            ? _generatedChildTagsByKey.Values.FirstOrDefault(t => t.Id == tagId)
+            : _tagCache.FirstOrDefault(t => t.Id == tagId);
     }
 
-    private Tag? FindChildTag(int parentTagId, string folderName)
+    private Tag? FindChildTag(int parentTagId, string subfolderPath)
     {
-        var name = ToChildTagName(folderName);
-        return _tagCache.FirstOrDefault(t => t.Parent?.Id == parentTagId
-            && string.Equals(t.Name, name, StringComparison.OrdinalIgnoreCase));
+        return _childTagsByKey.GetValueOrDefault(ChildTagKey(parentTagId, subfolderPath));
     }
 
     private static string ToChildTagName(string folderName)
@@ -303,7 +374,7 @@ public class DataCachingService
                     Add(FindCachedTag(parentTagId));
                 }
 
-                Add(FindChildTag(parentTagId, Path.GetFileName(childPath)));
+                Add(FindChildTag(parentTagId, childPath));
                 break;
 
             case (AssignmentKind.Manual, ApplyScope.SelfAndAllDescendants):
@@ -347,7 +418,7 @@ public class DataCachingService
                         else if (tag?.Parent?.Id is int parentTagId && parentTagId == assignment.AutoRuleParentTagId)
                         {
                             foreach (var subfolder in GetDirectSubfolders(_items, targetPath)
-                                .Where(folder => string.Equals(ToChildTagName(folder.Name), tag.Name, StringComparison.OrdinalIgnoreCase)))
+                                .Where(folder => FindChildTag(parentTagId, folder.Path) == tag))
                             {
                                 result.Add(subfolder);
                                 result.UnionWith(GetItemsBelow(_items, subfolder.Path));
@@ -576,7 +647,7 @@ public class DataCachingService
     {
         lock (_sync)
         {
-            return _tagCache.FirstOrDefault(t => t.Id == tagId);
+            return FindCachedTag(tagId);
         }
     }
 
@@ -595,12 +666,19 @@ public class DataCachingService
                 _tagCache.Add(new Tag(dto));
             }
 
-            // A new or renamed tag can be the child tag of a rule.
-            InvalidateInheritedCaches();
+            // A new tag can be the parent of a rule.
+            RebuildChildTags();
         }
 
         // Outside the lock: this raises PropertyChanged, which updates bound UI.
         cachedTag?.UpdateFrom(dto);
+
+        // Generated child tags look like their parent.
+        foreach (var generatedTag in Tags.Where(t => t.IsGenerated && t.Parent?.Id == dto.Id))
+        {
+            generatedTag.Color = dto.Color;
+            generatedTag.IconName = dto.IconName;
+        }
 
         WeakReferenceMessenger.Default.Send(new TagsChangedMessage());
         WeakReferenceMessenger.Default.Send(new TagApplicationsChangedMessage());
@@ -614,7 +692,7 @@ public class DataCachingService
         lock (_sync)
         {
             _tagCache.RemoveAll(t => t.Id == tagId);
-            InvalidateInheritedCaches();
+            RebuildChildTags();
         }
 
         WeakReferenceMessenger.Default.Send(new TagsChangedMessage());
@@ -634,7 +712,7 @@ public class DataCachingService
 
     /// <summary>
     /// Saves a new assignment and caches it with its direct and virtual applications. For a child-tag rule,
-    /// the tags of its subfolders are created as well.
+    /// the tags of its subfolders are generated as well.
     /// </summary>
     /// <param name="targetItem">The item the assignment sits on, if known; needed for items outside the cache.</param>
     public void AddAssignment(TagAssignment assignment, ExplorerItem? targetItem = null)
@@ -645,13 +723,13 @@ public class DataCachingService
         lock (_sync)
         {
             _tagAssignmentCache.Add(assignment);
-            InvalidateInheritedCaches();
             ApplyAssignment(assignment, targetItem);
+            RebuildChildTags();
         }
 
         if (assignment.Kind == AssignmentKind.AutoDirectChildrenAsChildTag)
         {
-            EnsureChildTags(assignment);
+            WeakReferenceMessenger.Default.Send(new TagsChangedMessage());
         }
 
         var affectedPath = AssignmentModes.ReachesOtherItems(assignment) ? null : assignment.TargetPath;
@@ -671,10 +749,15 @@ public class DataCachingService
             }
 
             _tagAssignmentCache.Remove(assignment);
-            InvalidateInheritedCaches();
+            RebuildChildTags();
         }
 
         ArchiveAssignment(assignment);
+
+        if (assignment.Kind == AssignmentKind.AutoDirectChildrenAsChildTag)
+        {
+            WeakReferenceMessenger.Default.Send(new TagsChangedMessage());
+        }
 
         WeakReferenceMessenger.Default.Send(new TagApplicationsChangedMessage());
     }
@@ -697,64 +780,120 @@ public class DataCachingService
     }
 
     /// <summary>
-    /// Creates the missing child tags of a child-tag rule: one per direct subfolder, named after it.
+    /// Stores a generated child tag, so it can be customised or assigned. The cached object is updated in place
+    /// (real id, no longer generated), so filter chips and badges holding it keep working. Stored tags are
+    /// returned unchanged.
     /// </summary>
-    private void EnsureChildTags(TagAssignment rule)
+    public Tag StoreGeneratedTag(Tag tag)
     {
-        if (rule.AutoRuleParentTagId is not int parentTagId)
+        if (!tag.IsGenerated)
         {
-            return;
+            return tag;
         }
 
-        List<Folder> subfoldersWithoutTag;
-        lock (_sync)
-        {
-            subfoldersWithoutTag = GetDirectSubfolders(_items, rule.TargetPath)
-                .Where(folder => FindChildTag(parentTagId, folder.Name) is null)
-                .ToList();
-        }
-
-        if (subfoldersWithoutTag.Count == 0)
-        {
-            return;
-        }
-
-        var parentDto = _db.Tags.Include(t => t.Color).FirstOrDefault(t => t.Id == parentTagId);
-        if (parentDto?.Color is null)
-        {
-            _logger?.LogWarning("Parent tag {TagId} of child-tag rule {AssignmentId} not found", parentTagId, rule.Id);
-            return;
-        }
-
-        var createdDtos = new List<TagDTO>();
-        foreach (var subfolder in subfoldersWithoutTag.DistinctBy(folder => ToChildTagName(folder.Name), StringComparer.OrdinalIgnoreCase))
-        {
-            var description = AutoChildTagDescriptionPrefix + subfolder.Path;
-            var dto = new TagDTO(
-                ToChildTagName(subfolder.Name),
-                parentDto.Color,
-                description.Length <= MaxTagDescriptionLength ? description : description[..MaxTagDescriptionLength],
-                aliases: null,
-                parentDto.IconName ?? string.Empty)
-            {
-                Parent = parentDto,
-                ParentId = parentDto.Id
-            };
-
-            _db.Tags.Add(dto);
-            createdDtos.Add(dto);
-        }
-
+        var dto = CreateChildTagDto(tag, isArchived: false);
+        _db.Tags.Add(dto);
         _db.SaveChanges();
 
+        tag.Id = dto.Id;
+        tag.IsGenerated = false;
+        tag.Description = dto.Description;
+
         lock (_sync)
         {
-            _tagCache.AddRange(createdDtos.Select(dto => new Tag(dto)));
-            InvalidateInheritedCaches();
+            _tagCache.Add(tag);
+            RebuildChildTags();
         }
 
         WeakReferenceMessenger.Default.Send(new TagsChangedMessage());
         WeakReferenceMessenger.Default.Send(new TagApplicationsChangedMessage());
+        return tag;
+    }
+
+    /// <summary>
+    /// Hides a child tag: its subfolder gets no tag any more. A generated tag is stored as archived; a stored one
+    /// loses its assignments and is archived. "Reset to generated" (DeleteTagWithChildren) undoes it.
+    /// </summary>
+    public void HideChildTag(Tag tag)
+    {
+        if (tag.AutoSourcePath is null)
+        {
+            return;
+        }
+
+        Tag hiddenTag;
+        if (tag.IsGenerated)
+        {
+            var dto = CreateChildTagDto(tag, isArchived: true);
+            _db.Tags.Add(dto);
+            _db.SaveChanges();
+            hiddenTag = new Tag(dto) { Parent = tag.Parent };
+        }
+        else
+        {
+            RemoveAssignmentsOfTag(tag.Id!.Value);
+            var dto = _db.Tags.First(t => t.Id == tag.Id);
+            dto.IsArchived = true;
+            dto.UpdatedAtUtc = DateTime.UtcNow;
+            _db.SaveChanges();
+            hiddenTag = tag;
+            hiddenTag.IsArchived = true;
+        }
+
+        lock (_sync)
+        {
+            _tagCache.Remove(tag);
+            _hiddenChildTags.Add(hiddenTag);
+            RebuildChildTags();
+        }
+
+        WeakReferenceMessenger.Default.Send(new TagsChangedMessage());
+        WeakReferenceMessenger.Default.Send(new TagApplicationsChangedMessage());
+    }
+
+    /// <summary>
+    /// Shows a hidden child tag again, with the name and settings it had. Assignments removed when it was hidden
+    /// are not restored.
+    /// </summary>
+    public void UnhideChildTag(int tagId)
+    {
+        var dto = _db.Tags.FirstOrDefault(t => t.Id == tagId);
+        if (dto is null || !IsHiddenChildTag(dto))
+        {
+            return;
+        }
+
+        dto.IsArchived = false;
+        dto.UpdatedAtUtc = DateTime.UtcNow;
+        _db.SaveChanges();
+
+        lock (_sync)
+        {
+            var hiddenTag = _hiddenChildTags.FirstOrDefault(t => t.Id == tagId);
+            if (hiddenTag is not null)
+            {
+                _hiddenChildTags.Remove(hiddenTag);
+                hiddenTag.IsArchived = false;
+                _tagCache.Add(hiddenTag);
+            }
+
+            RebuildChildTags();
+        }
+
+        WeakReferenceMessenger.Default.Send(new TagsChangedMessage());
+        WeakReferenceMessenger.Default.Send(new TagApplicationsChangedMessage());
+    }
+
+    private TagDTO CreateChildTagDto(Tag tag, bool isArchived)
+    {
+        var parentDto = _db.Tags.Include(t => t.Color).First(t => t.Id == tag.Parent!.Id);
+        return new TagDTO(tag.Name!, parentDto.Color, description: null, aliases: null, parentDto.IconName)
+        {
+            ParentId = parentDto.Id,
+            AutoSourcePath = tag.AutoSourcePath,
+            IsArchived = isArchived,
+            CreatedBy = Environment.UserName
+        };
     }
 
     /// <summary>
@@ -804,33 +943,14 @@ public class DataCachingService
         lock (_sync)
         {
             _tagCache.RemoveAll(t => t.Id is int id && ids.Contains(id));
-            InvalidateInheritedCaches();
+            _hiddenChildTags.RemoveAll(t => t.Id is int id && ids.Contains(id));
+
+            // A deleted child tag override makes its subfolder's tag generated again.
+            RebuildChildTags();
         }
 
         WeakReferenceMessenger.Default.Send(new TagsChangedMessage());
         WeakReferenceMessenger.Default.Send(new TagApplicationsChangedMessage());
-    }
-
-    /// <summary>
-    /// The child tags a rule created (by their "Auto: &lt;rule folder&gt;\..." description) that no assignment uses directly.
-    /// </summary>
-    public IReadOnlyList<Tag> GetUnusedChildTagsOfRule(TagAssignment rule)
-    {
-        if (rule.AutoRuleParentTagId is not int parentTagId)
-        {
-            return [];
-        }
-
-        var descriptionPrefix = AutoChildTagDescriptionPrefix + rule.TargetPath + Path.DirectorySeparatorChar;
-
-        lock (_sync)
-        {
-            return _tagCache
-                .Where(t => t.Parent?.Id == parentTagId
-                    && t.Description?.StartsWith(descriptionPrefix, StringComparison.OrdinalIgnoreCase) == true
-                    && _tagAssignmentCache.All(a => a.TagId != t.Id && a.AutoRuleParentTagId != t.Id))
-                .ToList();
-        }
     }
 
     private void RemoveApplicationFromCacheAndIndex(TagApplication application)

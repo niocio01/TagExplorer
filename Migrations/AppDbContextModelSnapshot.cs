@@ -102,6 +102,10 @@ namespace TagExplorer.Migrations
                     b.PrimitiveCollection<List<string>>("Aliases")
                         .HasColumnType("text[]");
 
+                    b.Property<string>("AutoSourcePath")
+                        .HasMaxLength(2048)
+                        .HasColumnType("varchar(2048)");
+
                     b.Property<int>("ColorId")
                         .HasColumnType("integer");
 
